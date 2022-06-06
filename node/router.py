@@ -86,9 +86,10 @@ async def get_pool_info(
 @router.get(
     "/pool/{identifier}/read",
     name="Read messages from pool",
-    description="Returns list of messages from requested pool.",
+    description="Returns list of messages from the requested pool.",
     responses=util.generate_responses(
-        "", [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException]
+        "Returns list of messages from the requested pool.",
+        [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
     ),
     response_model=list[models.db.Message],
 )
@@ -112,7 +113,7 @@ async def read_pool(
             return await crud.read_messages(pool, messages_count)
         else:
             raise exceptions.ConflictException(
-                message="Reader or master key required to access this pool."
+                message="Reader key or master key is required to access this pool."
             )
     else:
         return await crud.read_messages(pool, messages_count)
