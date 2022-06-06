@@ -10,7 +10,7 @@ router = APIRouter()
 @router.post(
     "/pool/new",
     name="Create a new pool",
-    description="""Creates a new pool.""",
+    description="Creates a new pool.",
     response_model=models.response.Pool,
     responses=util.generate_responses(
         "Returns a newly crated pool object.",
@@ -46,7 +46,7 @@ async def new_pool(body: models.request.Pool):
             reader_key_hash=reader_key_hash,
         )
         await pool.create()
-        logger.info(f"Generated new pool: {pool.uuid.hex}.")
+        logger.info(f"Created new pool: {pool.uuid.hex}.")
         return pool
     except ValidationError as err:
         raise exceptions.IncorrectInputException(message=str(err))
@@ -86,9 +86,9 @@ async def get_pool_info(
 @router.get(
     "/pool/{identifier}/read",
     name="Read messages from pool",
-    description="Returns list of messages from the requested pool.",
+    description="Returns a list of messages from the requested pool.",
     responses=util.generate_responses(
-        "Returns list of messages from the requested pool.",
+        "Returns a list of messages from the requested pool.",
         [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
     ),
     response_model=list[models.db.Message],
@@ -153,7 +153,8 @@ async def write_to_pool(
 @router.get(
     "/node",
     name="Get information about the node",
-    description="",
+    description="Returns node information.",
+    responses=util.generate_responses("Returns node information.", []),
     response_model=models.response.Node,
 )
 async def get_node_information():
