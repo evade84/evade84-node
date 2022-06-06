@@ -1,0 +1,19 @@
+services:
+  node:
+    image: fsoac-node
+    container_name: fsoac-node
+    build: ./
+    env_file:
+      - ./.env
+    depends_on:
+      - mongo
+    ports:
+      - 80:80
+  mongo:
+    image: mongo
+    container_name: fsoac-mongo
+    command:
+      - '--logpath'
+      - '/dev/null'
+    volumes:
+      - ./mongo:/data/db
