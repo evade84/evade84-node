@@ -11,7 +11,7 @@ services:
       - 80:80
   mongo:
     image: mongo
-    container_name: evade-mongo
+    container_name: evade84-mongo
     command:
       - '--logpath'
       - '/dev/null'
