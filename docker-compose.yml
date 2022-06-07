@@ -1,7 +1,7 @@
 services:
   node:
-    image: fsoac-node
-    container_name: fsoac-node
+    image: evade84-node
+    container_name: evade-node
     build: ./
     env_file:
       - ./.env
@@ -11,7 +11,7 @@ services:
       - 80:80
   mongo:
     image: mongo
-    container_name: fsoac-mongo
+    container_name: evade-mongo
     command:
       - '--logpath'
       - '/dev/null'
