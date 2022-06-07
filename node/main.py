@@ -11,7 +11,7 @@ from node.models.response import Error
 
 app = FastAPI(
     title="evade84",
-    description="Fundamental system of anonymous communication.",
+    description="Fundamental system of anonymous communication",
     version="0.1.0",
     redoc_url=None,
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
