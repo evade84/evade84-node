@@ -2,13 +2,13 @@ from fastapi import APIRouter
 from loguru import logger
 from pydantic import ValidationError
 
-from node import auth, crud, exceptions, models, util
+from node import auth, crud, exceptions, models, slicing, util
 
-router = APIRouter()
+router = APIRouter(prefix="/pool")
 
 
 @router.post(
-    "/pool/new",
+    "/new",
     name="Create a new pool",
     description="Creates a new pool.",
     response_model=models.response.Pool,
@@ -53,7 +53,26 @@ async def new_pool(body: models.request.Pool):
 
 
 @router.get(
-    "/pool/{identifier}",
+    "/list",
+    name="Get list of all indexable pools",
+    description="Returns list of all indexable pools.",
+    responses=util.generate_responses(
+        "Returns list of all indexable pools.",
+        [],
+    ),
+    response_model=models.response.Pools,
+)
+async def get_all_indexable_pools(first: int | None = None, last: int | None = None):
+    slicing.validate_params(first, last)
+    pools = await models.db.Pool.find(
+        models.db.Pool.indexable == True  # noqa
+    ).to_list()
+    sliced_pools = slicing.slice_list(pools, first, last)
+    return models.response.Pools(total=len(pools), pools=sliced_pools)
+
+
+@router.get(
+    "/{identifier}",
     name="Get information about pool",
     description="Returns requested pool object.",
     responses=util.generate_responses(
@@ -79,26 +98,32 @@ async def get_pool_info(
                 return pool
         else:
             raise exceptions.AccessDeniedException(
-                message="Access denied for this pool."
+                message="Access denied to this pool."
             )
 
 
 @router.get(
-    "/pool/{identifier}/read",
+    "/{identifier}/read",
     name="Read messages from pool",
-    description="Returns a list of messages from the requested pool.",
+    description="Returns list of messages from the requested pool.",
     responses=util.generate_responses(
-        "Returns a list of messages from the requested pool.",
-        [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
+        "Returns list of messages from the requested pool.",
+        [
+            exceptions.PoolDoesNotExistException,
+            exceptions.AccessDeniedException,
+            exceptions.IncorrectInputException,
+        ],
     ),
-    response_model=list[models.db.Message],
+    response_model=models.response.Messages,
 )
 async def read_pool(
     identifier: str,
-    messages_count: int,
+    first: int | None = None,
+    last: int | None = None,
     master_key: str | None = None,
     reader_key: str | None = None,
 ):
+    slicing.validate_params(first, last)
     pool = await crud.get_pool(identifier)
     if not pool:
         raise exceptions.PoolDoesNotExistException()
@@ -106,21 +131,19 @@ async def read_pool(
         if reader_key:
             if not auth.verify_key(reader_key, pool.reader_key_hash):
                 raise exceptions.AccessDeniedException(message="Invalid reader key.")
-            return
         elif master_key:
             if not auth.verify_key(master_key, pool.master_key_hash):
                 raise exceptions.AccessDeniedException(message="Invalid master key.")
-            return await crud.read_messages(pool, messages_count)
         else:
             raise exceptions.ConflictException(
                 message="Reader key or master key is required to access this pool."
             )
-    else:
-        return await crud.read_messages(pool, messages_count)
+    messages = slicing.slice_list(pool.messages, first, last)
+    return models.response.Messages(total=len(pool.messages), messages=messages)
 
 
 @router.put(
-    "/pool/{identifier}/write",
+    "/{identifier}/write",
     name="Write a message to pool",
     description="Adds a new message to pool messages list, returns newly created message object.",
     responses=util.generate_responses(
@@ -148,16 +171,3 @@ async def write_to_pool(
         return await crud.write_message(pool, text, signature)
     else:
         return await crud.write_message(pool, text, signature)
-
-
-@router.get(
-    "/node",
-    name="Get information about the node",
-    description="Returns node information.",
-    responses=util.generate_responses("Returns node information.", []),
-    response_model=models.response.Node,
-)
-async def get_node_information():
-    version = "0.1.0"
-    pools_count = await models.db.Pool.count()
-    return models.response.Node(version=version, pools_count=pools_count)

@@ -3,16 +3,18 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from motor import motor_asyncio
 
-from node import router
 from node.config import config
 from node.exceptions import APIErrorException
 from node.models.db import Pool
 from node.models.response import Error
+from node.routers.node import router as node_router
+from node.routers.pool import router as pool_router
 
 app = FastAPI(
     title="evade84",
     description="Fundamental system of anonymous communication",
     version="0.1.0",
+    docs_url="/",
     redoc_url=None,
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
 )
@@ -33,4 +35,5 @@ async def on_startup():
     )
 
     await init_beanie(client[config.MONGO_DB], document_models=[Pool])
-    app.include_router(router.router)
+    app.include_router(node_router)
+    app.include_router(pool_router)
