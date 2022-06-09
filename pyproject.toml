@@ -25,7 +25,7 @@ license = {text = "MIT"}
 start.cmd = "uvicorn node.main:app --reload --reload-dir ./node/"
 start.env_file = "debug.env"
 
-fmt.shell = "isort node/ && black node/"
+fmt.shell = "isort ./node/ && black ./node/"
 
 [tool.pdm.dev-dependencies]
 dev = [
