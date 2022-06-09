@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class Pool(BaseModel):
+class NewPool(BaseModel):
     tag: Optional[str] = None
 
     creator: Optional[str] = None
