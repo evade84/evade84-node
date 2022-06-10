@@ -15,9 +15,6 @@ router = APIRouter(prefix="/node")
 )
 async def get_node_information():
     version = "0.1.0"
-    indexable_pools_count = await models.db.Pool.find(
-        models.db.Pool.indexable == True  # noqa
-    ).count()
     return models.response.ResponseNode(
         name=config.NODE_NAME,
         version=version,
