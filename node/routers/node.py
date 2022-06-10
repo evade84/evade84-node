@@ -21,5 +21,4 @@ async def get_node_information():
     return models.response.ResponseNode(
         name=config.NODE_NAME,
         version=version,
-        indexable_pools_count=indexable_pools_count,
     )
