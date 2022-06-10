@@ -1,7 +1,7 @@
 from typing import Any, Type
 
 from node.exceptions import APIErrorException
-from node.models.response import Error
+from node.models.response import ResponseError
 
 
 def generate_responses(
@@ -13,6 +13,6 @@ def generate_responses(
     for exception in exceptions:
         responses[exception.status_code] = {
             "description": f"**{exception.description}**",
-            "model": Error,
+            "model": ResponseError,
         }
     return responses

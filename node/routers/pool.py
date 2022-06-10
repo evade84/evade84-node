@@ -11,7 +11,6 @@ router = APIRouter(prefix="/pool")
     "/new",
     name="Create a new pool",
     description="Creates a new pool.",
-    response_model=models.response.Pool,
     responses=util.generate_responses(
         "Returns a newly crated pool object.",
         exceptions=[
@@ -19,8 +18,9 @@ router = APIRouter(prefix="/pool")
             exceptions.IncorrectInputException,
         ],
     ),
+    response_model=models.response.ResponsePool,
 )
-async def new_pool(body: models.request.Pool):
+async def new_pool(body: models.body.NewPool):
     if body.tag:
         if await crud.get_pool(body.tag):
             raise exceptions.ConflictException(message="Tag is already in use.")
@@ -29,6 +29,10 @@ async def new_pool(body: models.request.Pool):
     reader_key_hash = None
 
     if body.reader_key:
+        if body.indexable:
+            raise exceptions.IncorrectInputException(
+                message="Pool with reader key cannot be indexable."
+            )
         if not body.master_key:
             raise exceptions.IncorrectInputException(
                 message="Master key must be specified if reader key was indicated."
@@ -47,7 +51,7 @@ async def new_pool(body: models.request.Pool):
         )
         await pool.create()
         logger.info(f"Created new pool: {pool.uuid.hex}.")
-        return pool
+        return models.response.ResponsePool.from_pool(pool)
     except ValidationError as err:
         raise exceptions.IncorrectInputException(message=str(err))
 
@@ -58,17 +62,17 @@ async def new_pool(body: models.request.Pool):
     description="Returns list of all indexable pools.",
     responses=util.generate_responses(
         "Returns list of all indexable pools.",
-        [],
+        [exceptions.IncorrectInputException],
     ),
-    response_model=models.response.Pools,
+    response_model=models.response.ResponsePools,
 )
 async def get_all_indexable_pools(first: int | None = None, last: int | None = None):
     slicing.validate_params(first, last)
     pools = await models.db.Pool.find(
         models.db.Pool.indexable == True  # noqa
     ).to_list()
-    sliced_pools = slicing.slice_list(pools, first, last)
-    return models.response.Pools(total=len(pools), pools=sliced_pools)
+    pools = slicing.slice_list(pools, first, last)
+    return models.response.ResponsePools.from_pools(pools)
 
 
 @router.get(
@@ -79,7 +83,7 @@ async def get_all_indexable_pools(first: int | None = None, last: int | None = N
         "Returns requested pool object.",
         [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
     ),
-    response_model=models.response.Pool,
+    response_model=models.response.ResponsePool,
 )
 async def get_pool_info(
     identifier: str, master_key: str | None = None, reader_key: str | None = None
@@ -88,17 +92,19 @@ async def get_pool_info(
     if not pool:
         raise exceptions.PoolDoesNotExistException()
     if pool.indexable:
-        return pool
+        return models.response.ResponsePool.from_pool(pool)
     else:
         if master_key:
-            if auth.verify_key(master_key, pool.reader_key_hash):
-                return pool
-        elif reader_key:
-            if auth.verify_key(reader_key, pool.reader_key_hash):
-                return pool
+            if not auth.verify_key(master_key, pool.master_key_hash):
+                raise exceptions.AccessDeniedException(message="Invalid master key.")
+            return models.response.ResponsePool.from_pool(pool)
+        elif reader_key and pool.reader_key_hash:
+            if not auth.verify_key(reader_key, pool.reader_key_hash):
+                raise exceptions.AccessDeniedException(message="Invalid reader key.")
+            return models.response.ResponsePool.from_pool(pool)
         else:
             raise exceptions.AccessDeniedException(
-                message="Access denied to this pool."
+                message="Access denied to this pool (master or reader key is required)."
             )
 
 
@@ -114,7 +120,7 @@ async def get_pool_info(
             exceptions.IncorrectInputException,
         ],
     ),
-    response_model=models.response.Messages,
+    response_model=models.response.ResponseMessages,
 )
 async def read_pool(
     identifier: str,
@@ -135,11 +141,11 @@ async def read_pool(
             if not auth.verify_key(master_key, pool.master_key_hash):
                 raise exceptions.AccessDeniedException(message="Invalid master key.")
         else:
-            raise exceptions.ConflictException(
+            raise exceptions.AccessDeniedException(
                 message="Reader key or master key is required to access this pool."
             )
     messages = slicing.slice_list(pool.messages, first, last)
-    return models.response.Messages(total=len(pool.messages), messages=messages)
+    return models.response.ResponseMessages.from_messages(messages)
 
 
 @router.put(
@@ -163,11 +169,9 @@ async def write_to_pool(
         raise exceptions.PoolDoesNotExistException()
     if pool.master_key_hash:
         if not master_key:
-            raise exceptions.ConflictException(
+            raise exceptions.AccessDeniedException(
                 message="Master key is required to write to this pool."
             )
         if not auth.verify_key(master_key, pool.master_key_hash):
             raise exceptions.AccessDeniedException(message="Invalid master key.")
-        return await crud.write_message(pool, text, signature)
-    else:
-        return await crud.write_message(pool, text, signature)
+    return await crud.write_message(pool, text, signature)

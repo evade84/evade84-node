@@ -13,8 +13,3 @@ async def write_message(pool: db.Pool, text: str, signature: str | None) -> db.M
     pool.messages.append(message)
     await pool.save()
     return message
-
-
-async def read_messages(pool: db.Pool, count) -> list[db.Message]:
-    messages = pool.messages[::-1][:count]
-    return messages[::-1]

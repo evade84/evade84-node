@@ -4,12 +4,12 @@ from pydantic import BaseModel
 
 
 class NewPool(BaseModel):
-    tag: Optional[str] = None
+    tag: str | None = None
 
-    creator: Optional[str] = None
-    description: Optional[str] = None
+    creator: str | None = None
+    description: str | None = None
 
-    master_key: Optional[str] = None
-    reader_key: Optional[str] = None
+    master_key: str | None = None
+    reader_key: str | None = None
 
-    indexable: Optional[bool] = None
+    indexable: bool | None = None

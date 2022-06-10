@@ -10,7 +10,7 @@ def hash_key(key: str) -> str:
 
 def verify_key(key: str, hash: str) -> bool:  # noqa
     try:
-        ph.verify(hash, key)
+        ph.verify(hash=hash, password=key)
         return True
     except VerifyMismatchError:
         return False

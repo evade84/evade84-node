@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from node import models, util
+from node.config import config
 
 router = APIRouter(prefix="/node")
 
@@ -10,13 +11,15 @@ router = APIRouter(prefix="/node")
     name="Get information about the current node",
     description="Returns current node information.",
     responses=util.generate_responses("Returns current node information.", []),
-    response_model=models.response.Node,
+    response_model=models.response.ResponseNode,
 )
 async def get_node_information():
     version = "0.1.0"
     indexable_pools_count = await models.db.Pool.find(
-        models.db.Pool.indexable == True
+        models.db.Pool.indexable == True  # noqa
     ).count()
-    return models.response.Node(
-        version=version, indexable_pools_count=indexable_pools_count
+    return models.response.ResponseNode(
+        name=config.NODE_NAME,
+        version=version,
+        indexable_pools_count=indexable_pools_count,
     )

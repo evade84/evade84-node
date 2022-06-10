@@ -1,17 +1,17 @@
 class APIErrorException(Exception):
     status_code: int
     description: str
-    error_message: str
+    error_message: str | None = None
 
     def __init__(self, status_code: int | None = None, message: str | None = None):
         if status_code:
             self.status_code = status_code
         if message:
             self.error_message = message
-        elif (
+        if (
             not self.error_message
         ):  # if no error message provided description becomes also an error message
-            self.error_message = self.description
+            self.error_message = self.description + "."
 
 
 class ConflictException(APIErrorException):
@@ -25,7 +25,7 @@ class NotFoundException(APIErrorException):
 
 
 class PoolDoesNotExistException(NotFoundException):
-    description = "Requested pool does not exist"
+    description = "Pool does not exist"
 
 
 class AccessDeniedException(APIErrorException):

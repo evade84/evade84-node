@@ -47,11 +47,11 @@ class Pool(Document):
 
     @validator("creator")
     def validate_author(cls, creator: str | None):  # noqa
-        return cls.validate_optional_using_regex(creator, r".+")
+        return cls.validate_optional_using_regex(creator, r".{1,40}")  # todo
 
     @validator("description")
     def validate_description(cls, description: str | None):  # noqa
-        return cls.validate_optional_using_regex(description, r".+")
+        return cls.validate_optional_using_regex(description, r".{1,500}")  # todo
 
     @validator("indexable")
     def validate_indexable(cls, indexable: bool | None):  # noqa
