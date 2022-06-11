@@ -10,12 +10,12 @@ from node.models.db import Pool
 from node.models.response import ResponseError
 from node.routers.node import router as node_router
 from node.routers.pool import router as pool_router
+from node.routers.root import router as root_router
 
 app = FastAPI(
     title=f"evade84-node ({config.NODE_NAME})",
     description="Fundamental system of anonymous communication.",
     version="0.1.0",
-    docs_url="/",
     redoc_url=None,
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
 )
@@ -39,3 +39,4 @@ async def on_startup():
     logger.info("Initialized database.")
     app.include_router(node_router)
     app.include_router(pool_router)
+    app.include_router(root_router)
