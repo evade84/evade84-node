@@ -13,7 +13,7 @@ from node.routers.pool import router as pool_router
 
 app = FastAPI(
     title=f"evade84-node ({config.NODE_NAME})",
-    description="Fundamental system of anonymous communication",
+    description="Fundamental system of anonymous communication.",
     version="0.1.0",
     docs_url="/",
     redoc_url=None,

@@ -7,7 +7,7 @@ router = APIRouter(prefix="/node")
 
 
 @router.get(
-    "/",
+    "",
     name="Get information about the current node",
     description="Returns current node information.",
     responses=util.generate_responses("Returns current node information.", []),
