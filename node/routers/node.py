@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-
 from node import models, util
 from node.config import config
 

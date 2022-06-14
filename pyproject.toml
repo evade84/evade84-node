@@ -1,9 +1,9 @@
 [project]
-name = ""
-version = ""
-description = ""
+name = "evade84-node"
+version = "0.1.0"
+description = "evade84 node"
 authors = [
-    {name = "jieggii", email = "jieggii.contact@gmail.com"},
+    {name = "jieggii", email = "jieggii@pm.me"},
 ]
 dependencies = [
     "fastapi>=0.78.0",
@@ -26,6 +26,7 @@ start.cmd = "uvicorn node.main:app --reload --reload-dir ./node/"
 start.env_file = "debug.env"
 
 fmt.shell = "isort ./node/ && black ./node/"
+lint = "flake8 ./node/"
 
 [tool.pdm.dev-dependencies]
 dev = [
@@ -33,6 +34,16 @@ dev = [
     "black>=22.3.0",
     "flake8>=4.0.1",
 ]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+src_paths = ["isort", "test"]
+
 [build-system]
 requires = ["pdm-pep517>=0.12.0"]
 build-backend = "pdm.pep517.api"

@@ -3,14 +3,10 @@ class APIErrorException(Exception):
     description: str
     error_message: str | None = None
 
-    def __init__(self, status_code: int | None = None, message: str | None = None):
-        if status_code:
-            self.status_code = status_code
+    def __init__(self, message: str | None = None):
         if message:
             self.error_message = message
-        if (
-            not self.error_message
-        ):  # if no error message provided description becomes also an error message
+        if not self.error_message:  # if no error message provided description becomes also an error message
             self.error_message = self.description + "."
 
 
@@ -26,6 +22,10 @@ class NotFoundException(APIErrorException):
 
 class PoolDoesNotExistException(NotFoundException):
     description = "Pool does not exist"
+
+
+class SignatureDoesNotExistException(NotFoundException):
+    description = "Signature does not exist"
 
 
 class AccessDeniedException(APIErrorException):
