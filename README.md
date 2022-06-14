@@ -7,8 +7,8 @@
 Clone **evade-84** repo.
 ```shell
 git clone https://github.com/evade84/evade84-node
-git checkout cf2f4f2  # stable version, supported by eef
 cd evade84-node/
+git checkout cf2f4f2  # stable version, supported by eef
 ```
 Create `.env` file and fill it.
 ```shell
