@@ -61,7 +61,7 @@ class ResponseMessage(BaseModel):
         return cls(
             id=message.id,
             text=message.text,
-            signature=ResponseSignature.from_db_signature(message.signature),
+            signature=ResponseSignature.from_db_signature(message.signature) if message.signature else None,
         )
 
 

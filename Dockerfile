@@ -1,6 +1,6 @@
 FROM python:3.10
 
-WORKDIR /usr/src/fsoac-node
+WORKDIR /usr/src/evade84-node
 COPY node ./node/
 COPY pyproject.toml pdm.lock* ./
 
