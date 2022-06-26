@@ -53,18 +53,18 @@ async def get_pool(
     else:
         if master_key:
             if not auth.verify_key(master_key, pool.master_key_hash):
-                raise exceptions.AccessDeniedException(message="Invalid master key.")
+                raise exceptions.AccessDeniedException("Invalid master key.")
             return models.response.Pool.from_db(pool)
         elif writer_key and pool.writer_key_hash:
             if not auth.verify_key(writer_key, pool.writer_key_hash):
-                raise exceptions.AccessDeniedException(message="Invalid writer key.")
+                raise exceptions.AccessDeniedException("Invalid writer key.")
             return models.response.Pool.from_db(pool)
         elif reader_key and pool.reader_key_hash:
             if not auth.verify_key(reader_key, pool.reader_key_hash):
-                raise exceptions.AccessDeniedException(message="Invalid reader key.")
+                raise exceptions.AccessDeniedException("Invalid reader key.")
         else:
             raise exceptions.AccessDeniedException(
-                message="Access denied (master, writer or reader key is required)."
+                "Access denied (master, writer or reader key is required)."
             )
 
 

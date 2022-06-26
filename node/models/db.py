@@ -49,6 +49,7 @@ class Message(BaseModel):
 
     signature: Link[Signature] | None = None
 
+
 class Pool(Document):
     type: PoolType
     uuid: UUID = Field(default_factory=uuid4)
