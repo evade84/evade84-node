@@ -13,6 +13,8 @@ dependencies = [
     "betterconf>=2.6.1",
     "argon2-cffi>=21.3.0",
     "loguru>=0.6.0",
+    "pycryptodome>=3.14.1",
+    "shortuuid>=1.0.9",
 ]
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -36,12 +38,12 @@ dev = [
 ]
 
 [tool.black]
-line-length = 120
+line-length = 105
 target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
-line_length = 120
+line_length = 105
 src_paths = ["isort", "test"]
 
 [build-system]

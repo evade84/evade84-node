@@ -1,84 +1,92 @@
-from operator import xor
-
-from node.exceptions import IncorrectInputException
-from pydantic import BaseModel, Field
-
-_SIGNATURE_TAG_REGEX = r"[\w\s-]{1,35}"
-
-_KEY_MIN_LENGTH = 8
-_KEY_MAX_LENGTH = 128
-
-_DESCRIPTION_MAX_LENGTH = 500
+from node.enums import PoolType
+from pydantic import BaseModel, Field, root_validator
 
 
-def validate_signature_fields(signature_tag: str | None, signature_key: str | None) -> bool:
-    if xor(bool(signature_tag), bool(signature_key)):
-        return False
-    return True
+def key_field(*, optional: bool = False):
+    if optional:
+        return Field(default=None, min_length=4, max_length=128)
+    else:
+        return Field(min_length=4, max_length=128)
 
 
-class RequestMessage(BaseModel):
-    text: str = Field(min_length=1, max_length=10000)
-    writer_key: str | None = Field(default=None, min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
-    signature_tag: str | None = Field(default=None, regex=_SIGNATURE_TAG_REGEX)
-    signature_key: str | None = Field(default=None, min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
-    hide_message_date: bool = Field(default=False)
-
-    def validate_message_signature_fields(self):
-        if not validate_signature_fields(self.signature_tag, self.signature_key):
-            raise IncorrectInputException("signature_tag and signature_key must be specified in pair.")
+def description_field():
+    return Field(default=None, min_length=1, max_length=1000)
 
 
-class RequestPool(BaseModel):
-    tag: str | None = Field(default=None, regex=r"[\w-]{1,500}")
-    description: str | None = Field(default=None, min_length=1, max_length=_DESCRIPTION_MAX_LENGTH)
+class Signature(BaseModel):
+    uuid: str = Field()
+    key: str = key_field()
 
-    creator_signature_tag: str | None = Field(default=None, regex=_SIGNATURE_TAG_REGEX)
-    creator_signature_key: str | None = Field(default=None, min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
 
-    master_key: str = Field(min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
-    writer_key: str | None = Field(default=None, min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
-    reader_key: str | None = Field(default=None, min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
+class UpdateSignature(BaseModel):
+    key: str = Field()
+    new_key: str | None = key_field(optional=True)
+    description: str | None = description_field()
 
+
+class NewSignature(BaseModel):
+    value: str = Field()
+    key: str = key_field()
+    description: str | None = description_field()
+
+
+class NewPool(BaseModel):
+    tag: str | None = Field(default=None)
+    description: str | None = description_field()
     public: bool = Field(default=False)
-    hide_creation_date: bool = Field(default=False)
+    creator_signature: Signature | None = Field(default=None)
 
-    class Config:
-        schema_extra = {
-            "example": {
-                "tag": "food-blog",
-                "description": "This is my blog. Here I log everything I ate!",
-                "creator_signature_tag": "Elon Musk",
-                "creator_signature_key": "very-strong-password",
-                "master_key": "the-most-strongest-password-i-have-ever-seen",
-                "writer_key": "qwerty12345",
-                "reader_key": "anyone-can-guess",
-                "public": True,
-                "hide_creation_date": False,
-            }
-        }
+    master_key: str = key_field()
+    writer_key: str | None = key_field(optional=True)
+    reader_key: str | None = key_field(optional=True)
 
-    def validate_creator_signature_fields(self):
-        if not validate_signature_fields(self.creator_signature_tag, self.creator_signature_key):
-            raise IncorrectInputException("Creator signature tag and creator signature key must be both specified.")
+    AES_encrypted: bool = Field(default=False)
+
+    def validate_fields(self, pool_type: PoolType) -> bool:
+        match pool_type:
+            case PoolType.wall:
+                return bool(
+                    not self.writer_key
+                    and not self.reader_key
+                    and not self.writer_key
+                    and not self.AES_encrypted
+                )
+            case PoolType.channel:
+                return bool(not self.reader_key and self.writer_key and not self.AES_encrypted)
+            case PoolType.tunnel:
+                return bool(self.writer_key and self.reader_key and self.AES_encrypted is not None)
+            case PoolType.mailbox:
+                return bool(not self.writer_key and self.reader_key and not self.AES_encrypted)
+            case _:
+                raise ValueError()
 
 
-class RequestEditPool(RequestPool):
-    master_key: str | None = Field(default=None, min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
+class NewMessage(BaseModel):
+    plaintext: str | None = None
 
+    AES_encrypted: bool = False
+    AES_ciphertext: bytes | None = None
+    AES_nonce: bytes | None = None
+    AES_tag: bytes | None = None
+    signature: Signature | None = None
 
-class RequestSignature(BaseModel):
-    tag: str = Field(regex=_SIGNATURE_TAG_REGEX)
-    key: str = Field(min_length=_KEY_MIN_LENGTH, max_length=_KEY_MAX_LENGTH)
-    description: str | None = Field(min_length=1, max_length=_DESCRIPTION_MAX_LENGTH)
-    hide_creation_date: bool = Field(default=False)
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "tag": "Elon Musk",
-                "key": "very-strong-password",
-                "description": "Official signature that belongs to Elon Musk.",
-                "hide_creation_date": False,
-            }
-        }
+    @root_validator
+    def validate_all_fields(cls, values):  # noqa
+        print(values)
+        # todo: I suppose it should be rewritten in more simple way
+        if values.get("plaintext") and not (
+            values.get("AES_encrypted")
+            or values.get("AES_ciphertext")
+            or values.get("AES_nonce")
+            or values.get("AES_tag")
+        ):
+            return values
+        elif not values.get("plaintext") and (
+            values.get("AES_encrypted")
+            and values.get("AES_ciphertext")
+            and values.get("AES_nonce")
+            and values.get("AES_tag")
+        ):
+            return values
+        else:
+            raise ValueError("Invalid parameters for this kind of message.")

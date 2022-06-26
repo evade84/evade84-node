@@ -6,7 +6,9 @@ class APIErrorException(Exception):
     def __init__(self, message: str | None = None):
         if message:
             self.error_message = message
-        if not self.error_message:  # if no error message provided description becomes also an error message
+        if (
+            not self.error_message
+        ):  # if no error message provided description becomes also an error message
             self.error_message = self.description + "."
 
 
@@ -24,7 +26,7 @@ class PoolDoesNotExistException(NotFoundException):
     description = "Pool does not exist"
 
 
-class SignatureDoesNotExistException(NotFoundException):
+class SignatureNotFoundException(NotFoundException):
     description = "Signature does not exist"
 
 

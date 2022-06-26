@@ -1,98 +1,96 @@
 from datetime import datetime
+from typing import Any
 
-from node.models import db
+from node.enums import PoolType
 from pydantic import BaseModel
 
 
-class ResponseError(BaseModel):
+class Error(BaseModel):
     error_message: str
 
 
-class ResponseSignature(BaseModel):
-    tag: str
-    description: str = None
-    creation_date: datetime = None
+class RequestValidationErrorResponse(Error):
+    detail: list[dict[str, Any]]
+
+
+class Signature(BaseModel):
+    uuid: str
+    value: str
+    description: str | None
+    created_at: datetime
 
     @classmethod
-    def from_db_signature(cls, signature: db.Signature):
+    def from_db(cls, signature):
         return cls(
-            tag=signature.tag,
+            uuid=signature.uuid,
+            value=signature.value,
             description=signature.description,
-            creation_date=signature.creation_date,
+            created_at=signature.created_at,
         )
 
 
-class ResponsePool(BaseModel):
+class Pool(BaseModel):
+    type: PoolType
+
     # identifiers
     address: str
-    tag: str = None
+    tag: str | None
 
     # meta data
+    description: str | None
+    created_at: datetime
+    creator_signature: Signature | None
     public: bool
-
-    description: str = None
-    creation_date: datetime = None
-    creator_signature: ResponseSignature = None
-
-    write_key_required: bool
-    read_key_required: bool
+    AES_encrypted: bool
 
     @classmethod
-    def from_db_pool(cls, pool: db.Pool):
+    def from_db(cls, pool):
+        signature = Signature.from_db(pool.creator_signature) if pool.creator_signature else None
         return cls(
+            type=pool.type,
             address=pool.address,
             tag=pool.tag,
-            public=pool.public,
             description=pool.description,
-            creation_date=pool.creation_date,
-            creator_signature=pool.creator_signature,
-            write_key_required=bool(pool.writer_key_hash),
-            read_key_required=bool(pool.reader_key_hash),
+            public=pool.public,
+            created_at=pool.created_at,
+            creator_signature=signature,
+            AES_encrypted=pool.AES_encrypted,
         )
 
 
-class ResponseMessage(BaseModel):
+class Message(BaseModel):
     id: int
-    text: str
-    signature: ResponseSignature = None
+    date: datetime
+    plaintext: str | None
+
+    AES_encrypted: bool
+    AES_ciphertext: bytes | None
+    AES_nonce: bytes | None
+    AES_tag: bytes | None
+
+    signature: Signature | None
 
     @classmethod
-    def from_db_message(cls, message: db.Message):
+    def from_db(cls, message):
         return cls(
             id=message.id,
-            text=message.text,
-            signature=ResponseSignature.from_db_signature(message.signature) if message.signature else None,
+            date=message.date,
+            plaintext=message.plaintext,
+            AES_encrypted=message.AES_encrypted,
+            AES_ciphertext=message.ciphertext,
+            AES_nonce=message.nonce,
+            AES_tag=message.tag,
+            signature=Signature.from_db(message.signature),
         )
 
 
-class ResponseMessages(BaseModel):
+class Messages(BaseModel):
+    AES_encrypted: bool
     total: int
     count: int
-    messages: list[ResponseMessage]
-
-    @classmethod
-    def from_messages(cls, total: int, messages: list[db.Message]):
-        return cls(
-            total=total,
-            count=len(messages),
-            messages=[ResponseMessage.from_db_message(message) for message in messages],
-        )
+    messages: list[Message]
 
 
-class ResponsePools(BaseModel):
-    total: int
-    count: int
-    pools: list[ResponsePool]
-
-    @classmethod
-    def from_pools(cls, total: int, pools: list[db.Pool]):
-        return cls(
-            total=total,
-            count=len(pools),
-            pools=[ResponsePool.from_db_pool(pool) for pool in pools],
-        )
-
-
-class ResponseNode(BaseModel):
+class Node(BaseModel):
     name: str
     version: str
