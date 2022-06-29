@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from loguru import logger
+
 from node import auth, crud, exceptions, models, slicing, util
 from node.enums import PoolType
 
@@ -8,34 +9,54 @@ router = APIRouter(prefix="/pool")
 
 @router.post(
     "/create",
-    response_model=models.response.Pool,
-    summary="Create pool",
+    response_model=models.response.ResponsePool,
+    summary="Create new pool",
     description="Creates new pool",
     responses=util.generate_responses(
-        "returns newly created pool object",
+        "Returns newly created pool object",
         [exceptions.ConflictException, exceptions.IncorrectInputException],
     ),
 )
-async def create_pool(pool_type: PoolType, pool: models.request.NewPool):
-    if not pool.validate_fields(pool_type):
+async def create_pool(pool_type: PoolType, new_pool: models.request.RequestNewPool):
+    if not new_pool.validate_fields(pool_type):
         raise exceptions.IncorrectInputException("Invalid fields for this type of pool.")
-    if pool.tag and await crud.get_pool(pool.tag):
+    if new_pool.tag and await crud.get_pool(new_pool.tag):
         raise exceptions.ConflictException("Tag is already in use.")
     creator_signature = (
-        await util.get_verified_signature(pool.creator_signature) if pool.creator_signature else None
+        await util.get_verified_signature(new_pool.creator_signature)
+        if new_pool.creator_signature
+        else None
     )
-    db_pool = await models.db.Pool.from_request(
-        pool_type=pool_type, pool=pool, creator_signature=creator_signature
+    pool = await models.db.Pool.from_request_model(
+        pool_type=pool_type, pool=new_pool, creator_signature=creator_signature
     )
-    await db_pool.create()
-    logger.info(f"Created new pool: {db_pool}.")
-    return models.response.Pool.from_db(db_pool)
+    await pool.save()
+    logger.info(f"Created new pool: {pool}.")
+    return models.response.ResponsePool.from_db_model(pool)
+
+
+@router.get(
+    "/list",
+    response_model=models.response.ResponsePools,
+    summary="Get list of public pools",
+    description="Returns list of public pool objects",
+    responses=util.generate_responses("Returns list of public pool objects", []),
+)
+async def list_public_pools(first: int | None = None, last: int | None = None):
+    slicing.validate_params(first, last)
+    pools = await crud.get_public_pools()
+    target_pools = slicing.slice_list(pools, first, last)
+    return models.response.ResponsePools(
+        total=len(pools),
+        count=len(target_pools),
+        pools=[models.response.ResponsePool.from_db_model(db_pool) for db_pool in target_pools],
+    )
 
 
 @router.get(
     "/{identifier}",
-    response_model=models.response.Pool,
-    summary="Get pool",
+    response_model=models.response.ResponsePool,
+    summary="Get pool information",
     description="Returns requested pool object",
     responses=util.generate_responses(
         "Returns requested pool object",
@@ -43,35 +64,36 @@ async def create_pool(pool_type: PoolType, pool: models.request.NewPool):
     ),
 )
 async def get_pool(
-    identifier: str, master_key: str | None, writer_key: str | None, reader_key: str | None
+    identifier: str,
+    master_key: str | None = None,
+    writer_key: str | None = None,
+    reader_key: str | None = None,
 ):
     pool = await crud.get_pool(identifier)
     if not pool:
         raise exceptions.PoolDoesNotExistException()
-    if pool.public:
-        return models.response.Pool.from_db(pool)
-    else:
+    if not pool.public:
         if master_key:
             if not auth.verify_key(master_key, pool.master_key_hash):
                 raise exceptions.AccessDeniedException("Invalid master key.")
-            return models.response.Pool.from_db(pool)
         elif writer_key and pool.writer_key_hash:
             if not auth.verify_key(writer_key, pool.writer_key_hash):
                 raise exceptions.AccessDeniedException("Invalid writer key.")
-            return models.response.Pool.from_db(pool)
         elif reader_key and pool.reader_key_hash:
             if not auth.verify_key(reader_key, pool.reader_key_hash):
                 raise exceptions.AccessDeniedException("Invalid reader key.")
         else:
             raise exceptions.AccessDeniedException(
-                "Access denied (master, writer or reader key is required)."
+                "Master, writer or reader key is required to get information about this pool."
             )
+    logger.info(f"Returned info about pool {pool}.")
+    return models.response.ResponsePool.from_db_model(pool)
 
 
 @router.get(
     "/{identifier}/read",
-    response_model=models.response.Messages,
-    name="Read messages from pool",
+    response_model=models.response.ResponseMessages,
+    summary="Read messages from pool",
     description="Returns list of messages from the requested pool",
     responses=util.generate_responses(
         "Returns list of messages from the requested pool",
@@ -100,8 +122,9 @@ async def read_pool(
             raise exceptions.AccessDeniedException("Reader key is required to read this pool.")
 
     messages = slicing.slice_list(pool.messages, first, last)
-    return models.response.Messages(
-        AES_encrypted=pool.AES_encrypted,
+    logger.info(f"Read some messages from pool {pool}.")
+    return models.response.ResponseMessages(
+        encrypted=pool.encrypted,
         total=len(pool.messages),
         count=len(messages),
         messages=messages,
@@ -110,8 +133,8 @@ async def read_pool(
 
 @router.post(
     "/{identifier}/write",
-    response_model=models.response.Message,
-    name="Write a message to pool",
+    response_model=models.response.ResponseMessage,
+    summary="Write a message to pool",
     description="Adds a new message to pool messages list, returns newly created message object",
     responses=util.generate_responses(
         "Returns newly created message object.",
@@ -120,7 +143,7 @@ async def read_pool(
 )
 async def write_to_pool(
     identifier: str,
-    message: models.request.NewMessage,
+    message: models.request.RequestNewMessage,
     writer_key: str | None = None,
 ):
     pool = await crud.get_pool(identifier)
@@ -132,8 +155,12 @@ async def write_to_pool(
         if not auth.verify_key(writer_key, pool.writer_key_hash):
             raise exceptions.AccessDeniedException("Invalid writer key.")
 
+    if pool.encrypted != bool(message.AES_ciphertext):
+        raise exceptions.ConflictException(
+            "Plaintext messages cannot be sent into AES encrypted pools and vise versa."
+        )
+
     signature = None
-    print(message)
     if message.signature:
         signature = await crud.get_signature(message.signature.uuid)
         if not signature:
@@ -142,4 +169,53 @@ async def write_to_pool(
             raise exceptions.AccessDeniedException("Invalid signature key.")
 
     db_message = await crud.write_message_to_pool(pool, message, signature)
+    logger.info(f"Wrote a new message to pool {pool}: {db_message}.")
     return db_message
+
+
+@router.post(
+    "/{identifier}/update",
+    response_model=models.response.ResponsePool,
+    summary="Update pool",
+    description="Updates some pool fields",
+    responses=util.generate_responses("Returns updated pool object", [exceptions.AccessDeniedException]),
+)
+async def update_pool(identifier: str, master_key: str, pool_data: models.request.RequestUpdatePool):
+    pool = await crud.get_pool(identifier)
+    if not pool:
+        raise exceptions.PoolDoesNotExistException()
+    if not auth.verify_key(master_key, pool.master_key_hash):
+        raise exceptions.AccessDeniedException("Invalid master key.")
+
+    if pool_data.new_description:
+        pool.description = pool_data.new_description
+    if pool_data.new_master_key:
+        pool.master_key_hash = auth.hash_key(pool_data.new_master_key)
+    if pool_data.new_writer_key:
+        pool.writer_key_hash = auth.hash_key(pool_data.new_writer_key)
+    if pool_data.new_reader_key:
+        pool.reader_key_hash = auth.hash_key(pool_data.new_reader_key)
+    await pool.save()
+    logger.info(f"Updated pool {pool}.")
+    return models.response.ResponsePool.from_db_model(pool)
+
+
+@router.delete(
+    "/{identifier}/delete",
+    response_model=models.response.ResponsePool,
+    summary="Delete pool",
+    description="Deletes pool",
+    responses=util.generate_responses(
+        "Returns deleted pool object.",
+        [exceptions.AccessDeniedException, exceptions.PoolDoesNotExistException],
+    ),
+)
+async def delete_pool(identifier: str, master_key: str):
+    pool = await crud.get_pool(identifier)
+    if not pool:
+        raise exceptions.PoolDoesNotExistException()
+    if not auth.verify_key(master_key, pool.master_key_hash):
+        raise exceptions.AccessDeniedException("Invalid master key.")
+    await pool.delete()
+    logger.info(f"Deleted pool {pool}.")
+    return models.response.ResponsePool.from_db_model(pool)

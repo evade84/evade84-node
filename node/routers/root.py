@@ -1,18 +1,24 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
-from node import NODE_VERSION
+
+from node import NODE_VERSION, util
 from node.config import config
 
 router = APIRouter(prefix="")
 
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="root route",
+    description="Returns welcoming HTML page",
+    responses=util.generate_responses("Returns a HTML page", api_exceptions=[]),
+)
 async def root():
     css = """
     <style>
     * {font-family: monospace;}
-    b {font-size: 25px;}
     a {font-size: 20px;}
+    b {font-size: 25px;}
     </style>
     """
     content = (

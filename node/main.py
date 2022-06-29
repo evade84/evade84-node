@@ -4,10 +4,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from loguru import logger
 from motor import motor_asyncio
+
 from node.config import config
 from node.exceptions import APIErrorException
 from node.models.db import Pool, Signature
-from node.models.response import Error, RequestValidationErrorResponse
+from node.models.response import ResponseError, ResponseRequestValidationError
 from node.routers.node import router as node_router
 from node.routers.pool import router as pool_router
 from node.routers.root import router as root_router
@@ -15,30 +16,30 @@ from node.routers.signature import router as signature_router
 
 tags_metadata = [
     {
-        "name": "Node",
-        "description": "Node information",
+        "name": "node",
+        "description": "node information",
         "externalDocs": {
             "description": "About nodes",
-            "url": "https://examle.com/",
+            "url": "https://evade84.github.io/getting-started/basic-definitions/#node",
         },
     },
     {
-        "name": "Pool",
-        "description": "Operations with pools",
+        "name": "pool",
+        "description": "operations with pools",
         "externalDocs": {
             "description": "About pools",
             "url": "https://evade84.github.io/getting-started/basic-definitions/#pool",
         },
     },
     {
-        "name": "Signature",
-        "description": "Operations with signatures",
+        "name": "signature",
+        "description": "operations with signatures",
         "externalDocs": {
             "description": "About signatures",
             "url": "https://evade84.github.io/getting-started/basic-definitions/#signature",
         },
     },
-    {"name": "Root", "description": "Root route"},
+    {"name": "root", "description": "root route"},
 ]
 
 app = FastAPI(
@@ -47,7 +48,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/swagger",
     redoc_url=None,
-    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+    # swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     openapi_tags=tags_metadata,
 )
 
@@ -55,7 +56,7 @@ app = FastAPI(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_, exc: RequestValidationError):
     return JSONResponse(
-        content=RequestValidationErrorResponse(
+        content=ResponseRequestValidationError(
             error_message="Request validation error.", detail=exc.errors()
         ).dict(),
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -65,7 +66,7 @@ async def validation_exception_handler(_, exc: RequestValidationError):
 @app.exception_handler(APIErrorException)
 async def api_error_exception_handler(_, exc: APIErrorException):
     return JSONResponse(
-        content=Error(error_message=exc.error_message).dict(), status_code=exc.status_code
+        content=ResponseError(error_message=exc.error_message).dict(), status_code=exc.status_code
     )
 
 
@@ -76,7 +77,7 @@ async def on_startup():
     )
     await init_beanie(client[config.MONGO_DB], document_models=[Pool, Signature])
     logger.info("Connected to the database.")
-    app.include_router(root_router, tags=["Root"])
-    app.include_router(node_router, tags=["Node"])
-    app.include_router(signature_router, tags=["Signature"])
-    app.include_router(pool_router, tags=["Pool"])
+    app.include_router(root_router, tags=["root"])
+    app.include_router(node_router, tags=["node"])
+    app.include_router(signature_router, tags=["signature"])
+    app.include_router(pool_router, tags=["pool"])

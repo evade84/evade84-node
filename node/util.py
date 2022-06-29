@@ -10,19 +10,21 @@ def generate_responses(
     responses = {
         200: {"description": f"**Successful response**\n\n{success_description}"},
         422: {
-            "description": f"**Request validation error**",
-            "model": models.response.RequestValidationErrorResponse,
+            "description": "**Request validation error**",
+            "model": models.response.ResponseRequestValidationError,
         },
     }
     for exception in api_exceptions:
         responses[exception.status_code] = {
             "description": f"**{exception.description}**",
-            "model": models.response.Error,
+            "model": models.response.ResponseError,
         }
     return responses
 
 
-async def get_verified_signature(signature: models.request.Signature) -> NoReturn | models.db.Signature:
+async def get_verified_signature(
+    signature: models.request.RequestSignature,
+) -> models.db.Signature | NoReturn:
     db_signature = await models.db.Signature.find_one(models.db.Signature.uuid == signature.uuid)
     if not db_signature:
         raise exceptions.SignatureNotFoundException()

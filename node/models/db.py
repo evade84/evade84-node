@@ -3,10 +3,11 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from beanie import Document, Link
-from node import auth
-from node.enums import PoolType
 from pydantic import BaseModel, Field, validator
 from shortuuid import ShortUUID
+
+from node import auth
+from node.enums import PoolType
 
 
 def short_uuid_factory():
@@ -14,18 +15,21 @@ def short_uuid_factory():
 
 
 class Signature(Document):
-    uuid: str = Field(default_factory=short_uuid_factory)  # todo
-    key_hash: str = Field()
+    uuid: str = Field(default_factory=short_uuid_factory)
+    key_hash: str
 
     # mutable meta data
-    description: str = Field(default=None)
+    description: str | None
 
     # immutable meta data
-    value: str = Field()
-    created_at: datetime = Field(default=None)
+    value: str
+    created_at: datetime
 
     class Collection:
         name = "signatures"
+
+    def __str__(self):
+        return f"Signature({self.uuid=}, {self.value=})"
 
     @classmethod
     def from_request(cls, signature):
@@ -40,14 +44,17 @@ class Signature(Document):
 class Message(BaseModel):
     id: int
     date: datetime
-    plaintext: str | None = None
 
-    AES_encrypted: bool = False
-    AES_ciphertext: bytes | None = None
-    AES_nonce: bytes | None = None
-    AES_tag: bytes | None = None
+    plaintext: str | None
 
-    signature: Link[Signature] | None = None
+    AES_ciphertext: bytes | None
+    AES_nonce: bytes | None
+    AES_tag: bytes | None
+
+    signature: Link[Signature] | None
+
+    def __str__(self):
+        return f"Message({self.plaintext}, {self.signature})"
 
 
 class Pool(Document):
@@ -56,35 +63,38 @@ class Pool(Document):
 
     # identifiers
     address: str = None
-    tag: str = Field(default=None)
+    tag: str | None
 
     # mutable meta data
-    description: str = Field(default=None)
-    public: bool = Field(default=False)
+    description: str | None
+    public: bool
 
     # immutable meta data
-    creator_signature: Link[Signature] = Field(default=None)
-    created_at: datetime = Field(default=None)
+    creator_signature: Link[Signature] | None
+    created_at: datetime
 
     # access keys
     master_key_hash: str = Field()
-    writer_key_hash: str = Field(default=None)
-    reader_key_hash: str = Field(default=None)
+    writer_key_hash: str | None
+    reader_key_hash: str | None
 
     # encryption settings (only pools with type `tunnel` can be encrypted)
-    AES_encrypted: bool = Field(default=False)
+    encrypted: bool
 
     messages: list[Message] = []
 
     class Collection:
         name = "pools"
 
+    def __str__(self):
+        return f"Pool({self.type}, {self.tag=}, {self.public=}, {self.creator_signature})"
+
     @validator("address", always=True)
     def set_address(cls, _, values: dict[str, Any]):  # noqa
         return values["uuid"].hex
 
     @classmethod
-    async def from_request(cls, pool_type: PoolType, pool, creator_signature: Link[Signature] | None):
+    async def from_request_model(cls, pool_type: PoolType, pool, creator_signature: Signature | None):
         master_key_hash = auth.hash_key(pool.master_key)
         writer_key_hash = auth.hash_key(pool.writer_key) if pool.writer_key else None
         reader_key_hash = auth.hash_key(pool.reader_key) if pool.reader_key else None
@@ -99,6 +109,6 @@ class Pool(Document):
             master_key_hash=master_key_hash,
             writer_key_hash=writer_key_hash,
             reader_key_hash=reader_key_hash,
-            AES_encrypted=pool.AES_encrypted,
+            encrypted=pool.encrypted,
             messages=[],
         )

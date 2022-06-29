@@ -1,26 +1,34 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
-from node.enums import PoolType
+from beanie import Link
 from pydantic import BaseModel
 
+from node.enums import PoolType
+from node.models import db
 
-class Error(BaseModel):
+
+class ResponseError(BaseModel):
     error_message: str
 
 
-class RequestValidationErrorResponse(Error):
+class ResponseRequestValidationError(ResponseError):
     detail: list[dict[str, Any]]
 
 
-class Signature(BaseModel):
+class ResponseSignature(BaseModel):
     uuid: str
     value: str
     description: str | None
     created_at: datetime
 
     @classmethod
-    def from_db(cls, signature):
+    async def from_link(cls, signature: Link[db.Signature]):
+        signature = await signature.fetch()
+        return cls.from_db_model(signature)
+
+    @classmethod
+    def from_db_model(cls, signature: db.Signature):
         return cls(
             uuid=signature.uuid,
             value=signature.value,
@@ -29,23 +37,26 @@ class Signature(BaseModel):
         )
 
 
-class Pool(BaseModel):
+class ResponsePool(BaseModel):
     type: PoolType
 
-    # identifiers
-    address: str
     tag: str | None
+    address: str
+    encrypted: bool
 
-    # meta data
-    description: str | None
-    created_at: datetime
-    creator_signature: Signature | None
     public: bool
-    AES_encrypted: bool
+    description: str | None = None
+
+    created_at: datetime
+    creator_signature: Optional[ResponseSignature]
 
     @classmethod
-    def from_db(cls, pool):
-        signature = Signature.from_db(pool.creator_signature) if pool.creator_signature else None
+    def from_db_model(cls, pool: db.Pool):
+        pool.creator_signature: db.Signature
+        if pool.creator_signature:
+            signature = ResponseSignature.from_db_model(pool.creator_signature)
+        else:
+            signature = None
         return cls(
             type=pool.type,
             address=pool.address,
@@ -54,43 +65,49 @@ class Pool(BaseModel):
             public=pool.public,
             created_at=pool.created_at,
             creator_signature=signature,
-            AES_encrypted=pool.AES_encrypted,
+            encrypted=pool.encrypted,
         )
 
 
-class Message(BaseModel):
+class ResponsePools(BaseModel):
+    total: int
+    count: int
+    pools: list[ResponsePool]
+
+
+class ResponseMessage(BaseModel):
     id: int
     date: datetime
     plaintext: str | None
 
-    AES_encrypted: bool
     AES_ciphertext: bytes | None
     AES_nonce: bytes | None
     AES_tag: bytes | None
 
-    signature: Signature | None
+    signature: ResponseSignature | None
 
     @classmethod
-    def from_db(cls, message):
+    async def from_db_model(cls, message: db.Message):
+        signature = await ResponseSignature.from_link(message.signature)
         return cls(
             id=message.id,
             date=message.date,
             plaintext=message.plaintext,
-            AES_encrypted=message.AES_encrypted,
-            AES_ciphertext=message.ciphertext,
-            AES_nonce=message.nonce,
-            AES_tag=message.tag,
-            signature=Signature.from_db(message.signature),
+            AES_ciphertext=message.AES_ciphertext,
+            AES_nonce=message.AES_nonce,
+            AES_tag=message.AES_tag,
+            signature=signature,
         )
 
 
-class Messages(BaseModel):
-    AES_encrypted: bool
+class ResponseMessages(BaseModel):
     total: int
     count: int
-    messages: list[Message]
+    encrypted: bool
+    messages: list[ResponseMessage]
 
 
-class Node(BaseModel):
+class ResponseNode(BaseModel):
     name: str
     version: str
+    pools_count: int

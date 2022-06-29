@@ -7,7 +7,7 @@ authors = [
 ]
 dependencies = [
     "fastapi>=0.78.0",
-    "uvicorn[standard]>=0.17.6",
+    "uvicorn[standard]==0.17.6",
     "beanie>=1.11.1",
     "motor>=2.5.1",
     "betterconf>=2.6.1",
@@ -24,7 +24,7 @@ license = {text = "MIT"}
 [tool.pdm]
 
 [tool.pdm.scripts]
-start.cmd = "uvicorn node.main:app --reload --reload-dir ./node/"
+start.cmd = "uvicorn node.main:app --host 0.0.0.0 --port 8080 --reload --reload-dir node/ --reload-exclude mongo/"
 start.env_file = "debug.env"
 
 fmt.shell = "isort ./node/ && black ./node/"
@@ -44,7 +44,6 @@ target-version = ["py310"]
 [tool.isort]
 profile = "black"
 line_length = 105
-src_paths = ["isort", "test"]
 
 [build-system]
 requires = ["pdm-pep517>=0.12.0"]
