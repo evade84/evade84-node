@@ -29,7 +29,7 @@ class Signature(Document):
         name = "signatures"
 
     def __str__(self):
-        return f"Signature({self.uuid=}, {self.value=})"
+        return f"Signature(uuid={self.uuid})"
 
     @classmethod
     def from_request(cls, signature):
@@ -44,17 +44,23 @@ class Signature(Document):
 class Message(BaseModel):
     id: int
     date: datetime
-
-    plaintext: str | None
-
-    AES_ciphertext: bytes | None
-    AES_nonce: bytes | None
-    AES_tag: bytes | None
-
     signature: Link[Signature] | None
 
+
+class PlaintextMessage(Message):
+    plaintext: str
+
     def __str__(self):
-        return f"Message({self.plaintext}, {self.signature})"
+        return f'PlaintextMessage({self.signature}: "{self.plaintext}")'
+
+
+class EncryptedMessage(Message):
+    AES_ciphertext: bytes
+    AES_nonce: bytes
+    AES_tag: bytes
+
+    def __str__(self):
+        return f"EncryptedMessage(len={len(self.AES_ciphertext)})"
 
 
 class Pool(Document):
@@ -78,16 +84,16 @@ class Pool(Document):
     writer_key_hash: str | None
     reader_key_hash: str | None
 
-    # encryption settings (only pools with type `tunnel` can be encrypted)
+    # encryption settings (only pools with type `chat` can be encrypted)
     encrypted: bool
 
-    messages: list[Message] = []
+    messages: list[PlaintextMessage | EncryptedMessage] = []
 
     class Collection:
         name = "pools"
 
     def __str__(self):
-        return f"Pool({self.type}, {self.tag=}, {self.public=}, {self.creator_signature})"
+        return f"Pool({self.tag} type={self.type}, signature={self.creator_signature}, public={self.public})"
 
     @validator("address", always=True)
     def set_address(cls, _, values: dict[str, Any]):  # noqa
