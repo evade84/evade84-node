@@ -35,6 +35,22 @@ class AccessDeniedException(APIErrorException):
     description = "Access to the requested resource has been denied"
 
 
+class InvalidMasterKeyException(AccessDeniedException):
+    description = "Invalid master key"
+
+
+class InvalidWriterKeyException(AccessDeniedException):
+    description = "Invalid writer key"
+
+
+class InvalidReaderKeyException(AccessDeniedException):
+    description = "Invalid reader key"
+
+
+class InvalidSignatureKey(AccessDeniedException):
+    description = "Invalid signature key"
+
+
 class IncorrectInputException(APIErrorException):
     status_code = 400
     description = "Input data is incorrect"

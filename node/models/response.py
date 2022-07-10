@@ -4,8 +4,8 @@ from typing import Any, Optional
 from beanie import Link
 from pydantic import BaseModel
 
-from node.enums import PoolType
-from node.models import db
+from node.enums import MessageType, PoolType
+from node.models import database
 
 
 class ResponseError(BaseModel):
@@ -23,12 +23,12 @@ class ResponseSignature(BaseModel):
     created_at: datetime
 
     @classmethod
-    async def from_link(cls, signature: Link[db.Signature]):
+    async def from_link(cls, signature: Link[database.Signature]):
         signature = await signature.fetch()
         return cls.from_db_model(signature)
 
     @classmethod
-    def from_db_model(cls, signature: db.Signature):
+    def from_db_model(cls, signature: database.Signature):
         return cls(
             uuid=signature.uuid,
             value=signature.value,
@@ -51,12 +51,12 @@ class ResponsePool(BaseModel):
     creator_signature: Optional[ResponseSignature]
 
     @classmethod
-    def from_db_model(cls, pool: db.Pool):
-        pool.creator_signature: db.Signature
+    def from_db_model(cls, pool: database.Pool):
+        pool.creator_signature: database.Signature  # noqa
         if pool.creator_signature:
-            signature = ResponseSignature.from_db_model(pool.creator_signature)
+            creator_signature = ResponseSignature.from_db_model(pool.creator_signature)
         else:
-            signature = None
+            creator_signature = None
         return cls(
             type=pool.type,
             address=pool.address,
@@ -64,7 +64,7 @@ class ResponsePool(BaseModel):
             description=pool.description,
             public=pool.public,
             created_at=pool.created_at,
-            creator_signature=signature,
+            creator_signature=creator_signature,
             encrypted=pool.encrypted,
         )
 
@@ -75,28 +75,42 @@ class ResponsePools(BaseModel):
     pools: list[ResponsePool]
 
 
-class ResponseMessage(BaseModel):
+class _ResponseMessage(BaseModel):
+    type: MessageType
     id: int
     date: datetime
-    plaintext: str | None
-
-    AES_ciphertext: bytes | None
-    AES_nonce: bytes | None
-    AES_tag: bytes | None
-
     signature: ResponseSignature | None
 
+
+class ResponsePlaintextMessage(_ResponseMessage):
+    plaintext: str
+
     @classmethod
-    async def from_db_model(cls, message: db.Message):
-        signature = await ResponseSignature.from_link(message.signature)
+    def from_db_model(cls, message: database.PlaintextMessage):
         return cls(
+            type=message.type,
             id=message.id,
             date=message.date,
+            signature=message.signature,
             plaintext=message.plaintext,
+        )
+
+
+class ResponseEncryptedMessage(_ResponseMessage):
+    AES_ciphertext: bytes
+    AES_nonce: bytes
+    AES_tag: bytes
+
+    @classmethod
+    def from_db_model(cls, message: database.EncryptedMessage):
+        return cls(
+            type=message.type,
+            id=message.id,
+            date=message.date,
+            signature=message.signature,
             AES_ciphertext=message.AES_ciphertext,
             AES_nonce=message.AES_nonce,
             AES_tag=message.AES_tag,
-            signature=signature,
         )
 
 
@@ -104,10 +118,13 @@ class ResponseMessages(BaseModel):
     total: int
     count: int
     encrypted: bool
-    messages: list[ResponseMessage]
+    messages: list[ResponsePlaintextMessage | ResponseEncryptedMessage]
 
 
 class ResponseNode(BaseModel):
     name: str
+    description: str
     version: str
+    uptime: int
     pools_count: int
+    signatures_count: int

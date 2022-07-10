@@ -14,7 +14,7 @@ router = APIRouter(prefix="/signature")
     responses=util.generate_responses("Returns newly created signature", []),
 )
 async def create_signature(signature: models.request.RequestNewSignature):
-    db_signature = models.db.Signature.from_request(signature)
+    db_signature = models.database.Signature.from_request(signature)
     await db_signature.create()
     logger.info(f"Created new signature: {db_signature}.")
     return models.response.ResponseSignature.from_db_model(db_signature)

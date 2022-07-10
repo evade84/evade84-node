@@ -1,8 +1,10 @@
+from typing import Union
+
 from fastapi import APIRouter
 from loguru import logger
 
 from node import auth, crud, exceptions, models, slicing, util
-from node.enums import PoolType
+from node.enums import MessageType, PoolType
 
 router = APIRouter(prefix="/pool")
 
@@ -17,9 +19,16 @@ router = APIRouter(prefix="/pool")
         [exceptions.ConflictException, exceptions.IncorrectInputException],
     ),
 )
-async def create_pool(pool_type: PoolType, new_pool: models.request.RequestNewPool):
-    if not new_pool.validate_fields(pool_type):
-        raise exceptions.IncorrectInputException("Invalid fields for this type of pool.")
+async def create_pool(
+    type: PoolType,  # noqa
+    new_pool: models.request.RequestNewPool,
+):
+    errors = new_pool.validate_based_on_type(type)
+    if errors:
+        raise exceptions.IncorrectInputException(
+            util.build_errors_message("Incorrect pool fields", errors)
+        )
+
     if new_pool.tag and await crud.get_pool(new_pool.tag):
         raise exceptions.ConflictException("Tag is already in use.")
     creator_signature = (
@@ -27,12 +36,10 @@ async def create_pool(pool_type: PoolType, new_pool: models.request.RequestNewPo
         if new_pool.creator_signature
         else None
     )
-    pool = await models.db.Pool.from_request_model(
-        pool_type=pool_type, pool=new_pool, creator_signature=creator_signature
-    )
-    await pool.save()
-    logger.info(f"Created new pool: {pool}.")
-    return models.response.ResponsePool.from_db_model(pool)
+    db_pool = models.database.Pool.from_request_model(type, new_pool, creator_signature)
+    await db_pool.save()
+    logger.info(f"Created new pool: {db_pool}.")
+    return models.response.ResponsePool.from_db_model(db_pool)
 
 
 @router.get(
@@ -75,16 +82,16 @@ async def get_pool(
     if not pool.public:
         if master_key:
             if not auth.verify_key(master_key, pool.master_key_hash):
-                raise exceptions.AccessDeniedException("Invalid master key.")
+                raise exceptions.InvalidMasterKeyException()
         elif writer_key and pool.writer_key_hash:
             if not auth.verify_key(writer_key, pool.writer_key_hash):
-                raise exceptions.AccessDeniedException("Invalid writer key.")
+                raise exceptions.InvalidWriterKeyException()
         elif reader_key and pool.reader_key_hash:
             if not auth.verify_key(reader_key, pool.reader_key_hash):
-                raise exceptions.AccessDeniedException("Invalid reader key.")
+                raise exceptions.InvalidReaderKeyException()
         else:
             raise exceptions.AccessDeniedException(
-                "Master, writer or reader key is required to get information about this pool."
+                "The pool is not public: master, writer or reader key is required to get information about this pool."
             )
     logger.info(f"Returned info about pool {pool}.")
     return models.response.ResponsePool.from_db_model(pool)
@@ -117,7 +124,7 @@ async def read_pool(
     if pool.reader_key_hash:
         if reader_key:
             if not auth.verify_key(reader_key, pool.reader_key_hash):
-                raise exceptions.AccessDeniedException("Invalid reader key.")
+                raise exceptions.InvalidReaderKeyException()
         else:
             raise exceptions.AccessDeniedException("Reader key is required to read this pool.")
 
@@ -133,7 +140,9 @@ async def read_pool(
 
 @router.post(
     "/{identifier}/write",
-    response_model=models.response.ResponseMessage,
+    response_model=Union[
+        models.response.ResponsePlaintextMessage, models.response.ResponseEncryptedMessage
+    ],
     summary="Write a message to pool",
     description="Adds a new message to pool messages list, returns newly created message object",
     responses=util.generate_responses(
@@ -143,34 +152,44 @@ async def read_pool(
 )
 async def write_to_pool(
     identifier: str,
+    message_type: MessageType,
     message: models.request.RequestNewMessage,
     writer_key: str | None = None,
 ):
+    errors = message.validate_based_on_type(message_type)
+    if errors:
+        raise exceptions.IncorrectInputException(
+            util.build_errors_message("Invalid message fields", errors)
+        )
+
     pool = await crud.get_pool(identifier)
     if not pool:
         raise exceptions.PoolDoesNotExistException()
+
     if pool.writer_key_hash:
         if not writer_key:
             raise exceptions.AccessDeniedException("Writer key is required to write to this pool.")
         if not auth.verify_key(writer_key, pool.writer_key_hash):
             raise exceptions.AccessDeniedException("Invalid writer key.")
 
-    if pool.encrypted != bool(message.AES_ciphertext):
+    if pool.encrypted != (message_type == MessageType.encrypted):
         raise exceptions.ConflictException(
-            "Plaintext messages cannot be sent into AES encrypted pools and vise versa."
+            "Pool encryption settings does not match with the message type "
+            "(you are sending plaintext message to an encrypted pool or vise versa)."
         )
 
-    signature = None
-    if message.signature:
-        signature = await crud.get_signature(message.signature.uuid)
-        if not signature:
-            raise exceptions.SignatureNotFoundException()
-        if not auth.verify_key(message.signature.key, signature.key_hash):
-            raise exceptions.AccessDeniedException("Invalid signature key.")
-
+    signature = await util.get_verified_signature(message.signature) if message.signature else None
     db_message = await crud.write_message_to_pool(pool, message, signature)
     logger.info(f"Wrote a new message to pool {pool}: {db_message}.")
-    return db_message
+
+    match db_message.type:
+        case MessageType.plaintext:
+            print(1)
+            return models.response.ResponsePlaintextMessage.from_db_model(db_message)
+        case MessageType.encrypted:
+            return models.response.ResponseEncryptedMessage.from_db_model(db_message)
+        case _:
+            raise ValueError("Invalid message type.")
 
 
 @router.post(
@@ -185,7 +204,7 @@ async def update_pool(identifier: str, master_key: str, pool_data: models.reques
     if not pool:
         raise exceptions.PoolDoesNotExistException()
     if not auth.verify_key(master_key, pool.master_key_hash):
-        raise exceptions.AccessDeniedException("Invalid master key.")
+        raise exceptions.InvalidMasterKeyException()
 
     if pool_data.new_description:
         pool.description = pool_data.new_description
@@ -215,7 +234,7 @@ async def delete_pool(identifier: str, master_key: str):
     if not pool:
         raise exceptions.PoolDoesNotExistException()
     if not auth.verify_key(master_key, pool.master_key_hash):
-        raise exceptions.AccessDeniedException("Invalid master key.")
+        raise exceptions.InvalidMasterKeyException()
     await pool.delete()
     logger.info(f"Deleted pool {pool}.")
     return models.response.ResponsePool.from_db_model(pool)

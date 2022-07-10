@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, root_validator
+from typing import Any
 
-from node.enums import PoolType
+from pydantic import BaseModel, Extra, Field, ValidationError, root_validator, validator
+
+from node.enums import MessageType, PoolType
 
 
 def KeyField(*, optional: bool = False):  # noqa
@@ -12,6 +14,10 @@ def KeyField(*, optional: bool = False):  # noqa
 
 def DescriptionField():  # noqa
     return Field(default=None, min_length=1, max_length=1000)
+
+
+def TagField():  # noqa
+    return Field(default=None, regex=r".+")
 
 
 class RequestUpdateSignature(BaseModel):
@@ -45,74 +51,86 @@ class RequestUpdatePool(BaseModel):
     new_reader_key: str | None = KeyField(optional=True)
 
 
-class RequestNewPool(BaseModel):
-    tag: str | None = Field(default=None)
+class RequestNewPool(BaseModel, extra=Extra.forbid):
+    tag: str | None = TagField()
     description: str | None = DescriptionField()
+
     public: bool = Field(default=False)
+    encrypted: bool = Field(default=False)
+
     creator_signature: RequestSignature | None = Field(default=None)
 
     master_key: str = KeyField()
-    writer_key: str | None = KeyField(optional=True)
-    reader_key: str | None = KeyField(optional=True)
+    writer_key: str = KeyField(optional=True)
+    reader_key: str = KeyField(optional=True)
 
-    encrypted: bool = Field(default=False)
-
-    def validate_fields(self, pool_type: PoolType) -> bool:  # todo: use root validator instead (?)
+    def validate_based_on_type(self, pool_type: PoolType) -> list[str]:
+        """Returns list of errors detected. (Empty list if not errors)"""
+        errors = []
         match pool_type:
             case PoolType.wall:
-                return bool(
-                    not self.writer_key
-                    and not self.reader_key
-                    and not self.writer_key
-                    and not self.encrypted
-                )
+                if self.writer_key:
+                    errors.append("pool with type wall must not have writer key")
+                if self.reader_key:
+                    errors.append("pool with type wall must not have reader key")
             case PoolType.channel:
-                return bool(not self.reader_key and self.writer_key and not self.encrypted)
+                if not self.writer_key:
+                    errors.append("pool with type channel must have writer key")
+                if self.reader_key:
+                    errors.append("pool with type channel must not have reader key")
             case PoolType.chat:
-                return bool(self.writer_key and self.reader_key and self.encrypted is not None)
+                if not self.writer_key:
+                    errors.append("pool with type chat must have writer key")
+                if not self.reader_key:
+                    errors.append("pool with type chat must have reader key")
             case PoolType.mailbox:
-                return bool(not self.writer_key and self.reader_key and not self.encrypted)
+                if self.writer_key:
+                    errors.append("pool with type mailbox must not have writer key")
+                if not self.reader_key:
+                    errors.append("pool with type mailbox must have reader key")
             case _:
-                raise ValueError()
+                raise ValueError("Invalid pool type.")
+
+        if pool_type != PoolType.chat and self.encrypted is True:
+            errors.append(
+                f"pool with type {pool_type} can't be encrypted (only pools with type chat can be encrypted)"
+            )
+        return errors
 
 
-class RequestNewMessage(BaseModel):
-    signature: RequestSignature | None = None
+class RequestNewMessage(BaseModel, extra=Extra.forbid):
+    signature: RequestSignature | None = Field(default=None)
 
+    plaintext: str | None = Field(default=None, min_length=1, max_length=10000)
 
-class RequestNewPlaintextMessage(RequestNewMessage):
-    plaintext: str = Field(min_length=1, max_length=10000)
+    AES_ciphertext: bytes | None = Field(default=None, min_length=1)
+    AES_nonce: bytes | None = Field(default=None, min_length=1)
+    AES_tag: bytes | None = Field(default=None, min_length=1)
 
+    def validate_based_on_type(self, message_type: MessageType) -> list[str]:
+        errors = []
+        match message_type:
+            case MessageType.plaintext:
+                if not self.plaintext:
+                    errors.append("plaintext message must have plaintext field.")
+                if self.AES_ciphertext:
+                    errors.append("plaintext message must not have AES_ciphertext field.")
+                if self.AES_nonce:
+                    errors.append("plaintext message must not have AES_nonce field.")
+                if self.AES_tag:
+                    errors.append("plaintext message must not have AES_tag field.")
 
-class RequestNewEncryptedMessage(RequestNewMessage):
-    AES_ciphertext: bytes = Field(min_length=1)
-    AES_nonce: bytes = Field(min_length=1)
-    AES_tag: bytes = Field(min_length=1)
+            case MessageType.encrypted:
+                if self.plaintext:
+                    errors.append("encrypted message must not have plaintext field.")
+                if not self.AES_ciphertext:
+                    errors.append("encrypted message must have AES_ciphertext field.")
+                if not self.AES_nonce:
+                    errors.append("encrypted message must have AES_nonce field.")
+                if not self.AES_tag:
+                    errors.append("encrypted message must have AES_tag field.")
 
+            case _:
+                raise ValueError("Invalid message type.")
 
-    # @staticmethod
-    # def _validate_all_fields(
-    #     plaintext: str | None = None,
-    #     AES_ciphertext: bytes | None = None,
-    #     AES_nonce: bytes | None = None,
-    #     AES_tag: bytes | None = None,
-    # ):
-    #     if plaintext and not (AES_ciphertext or AES_nonce or AES_tag):
-    #         return
-    #     elif (not plaintext) and (AES_ciphertext and AES_nonce and AES_tag):
-    #         return
-    #     else:
-    #         raise ValueError(
-    #             "Single plaintext / AES_ciphertext, AES_nonce and AES_tag (at once) must be set."
-    #         )
-    #
-    # @root_validator
-    # def validate_all_fields(cls, values):  # noqa
-    #     cls._validate_all_fields(
-    #         values.get("plaintext"),
-    #         values.get("AES_ciphertext"),
-    #         values.get("AES_nonce"),
-    #         values.get("AES_tag"),
-    #     )
-    #     return values
-#
+        return errors

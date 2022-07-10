@@ -1,7 +1,13 @@
 from typing import Any, NoReturn, Type
 
 from node import auth, exceptions, models
+
+# from node.enums import PoolType
 from node.exceptions import APIErrorException
+
+# from fastapi.exceptions import RequestValidationError
+# from pydantic import BaseConfig, ValidationError
+# from pydantic.error_wrappers import ErrorWrapper, error_dict
 
 
 def generate_responses(
@@ -24,10 +30,16 @@ def generate_responses(
 
 async def get_verified_signature(
     signature: models.request.RequestSignature,
-) -> models.db.Signature | NoReturn:
-    db_signature = await models.db.Signature.find_one(models.db.Signature.uuid == signature.uuid)
+) -> models.database.Signature | NoReturn:
+    db_signature = await models.database.Signature.find_one(
+        models.database.Signature.uuid == signature.uuid
+    )
     if not db_signature:
         raise exceptions.SignatureNotFoundException()
     if not auth.verify_key(signature.key, db_signature.key_hash):
         raise exceptions.AccessDeniedException("Invalid signature key.")
     return db_signature
+
+
+def build_errors_message(prefix: str, errors: list[str]):
+    return f"{prefix}: {', '.join(errors)}."

@@ -6,8 +6,8 @@ from beanie import Document, Link
 from pydantic import BaseModel, Field, validator
 from shortuuid import ShortUUID
 
-from node import auth
-from node.enums import PoolType
+from node import auth, models
+from node.enums import MessageType, PoolType
 
 
 def short_uuid_factory():
@@ -29,7 +29,7 @@ class Signature(Document):
         name = "signatures"
 
     def __str__(self):
-        return f"Signature(uuid={self.uuid})"
+        return f"Signature({self.value}, uuid={self.uuid})"
 
     @classmethod
     def from_request(cls, signature):
@@ -42,6 +42,7 @@ class Signature(Document):
 
 
 class Message(BaseModel):
+    type: MessageType
     id: int
     date: datetime
     signature: Link[Signature] | None
@@ -51,7 +52,7 @@ class PlaintextMessage(Message):
     plaintext: str
 
     def __str__(self):
-        return f'PlaintextMessage({self.signature}: "{self.plaintext}")'
+        return f'PlaintextMessage("{self.plaintext}" by={self.signature})'
 
 
 class EncryptedMessage(Message):
@@ -60,7 +61,7 @@ class EncryptedMessage(Message):
     AES_tag: bytes
 
     def __str__(self):
-        return f"EncryptedMessage(len={len(self.AES_ciphertext)})"
+        return f"EncryptedMessage({len(self.AES_ciphertext)} chars by={self.signature})"
 
 
 class Pool(Document):
@@ -93,14 +94,14 @@ class Pool(Document):
         name = "pools"
 
     def __str__(self):
-        return f"Pool({self.tag} type={self.type}, signature={self.creator_signature}, public={self.public})"
+        return f"Pool_{self.type}({self.tag} ({self.address}) creator={self.creator_signature} public={self.public})"
 
     @validator("address", always=True)
     def set_address(cls, _, values: dict[str, Any]):  # noqa
         return values["uuid"].hex
 
     @classmethod
-    async def from_request_model(cls, pool_type: PoolType, pool, creator_signature: Signature | None):
+    def from_request_model(cls, pool_type: PoolType, pool, creator_signature: Signature | None):
         master_key_hash = auth.hash_key(pool.master_key)
         writer_key_hash = auth.hash_key(pool.writer_key) if pool.writer_key else None
         reader_key_hash = auth.hash_key(pool.reader_key) if pool.reader_key else None

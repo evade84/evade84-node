@@ -22,8 +22,7 @@ async def root():
     </style>
     """
     content = (
-        css
-        + f"""
+        css + f"""
     <b>Welcome to evade84-node v{NODE_VERSION} ({config.NODE_NAME})</b>.
     <ul>
     <li><a href="/swagger">swagger ui (API documentation)</a></li>

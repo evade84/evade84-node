@@ -7,7 +7,7 @@ from motor import motor_asyncio
 
 from node.config import config
 from node.exceptions import APIErrorException
-from node.models.db import Pool, Signature
+from node.models.database import Pool, Signature
 from node.models.response import ResponseError, ResponseRequestValidationError
 from node.routers.node import router as node_router
 from node.routers.pool import router as pool_router
