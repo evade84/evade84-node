@@ -12,7 +12,7 @@ router = APIRouter(prefix="/pool")
 @router.post(
     "/create",
     response_model=models.response.ResponsePool,
-    summary="Create new pool",
+    summary="Create a new pool",
     description="Creates new pool",
     responses=util.generate_responses(
         "Returns newly created pool object",
@@ -45,7 +45,7 @@ async def create_pool(
 @router.get(
     "/list",
     response_model=models.response.ResponsePools,
-    summary="Get list of public pools",
+    summary="Get list of all public pools",
     description="Returns list of public pool objects",
     responses=util.generate_responses("Returns list of public pool objects", []),
 )
@@ -179,12 +179,11 @@ async def write_to_pool(
         )
 
     signature = await util.get_verified_signature(message.signature) if message.signature else None
-    db_message = await crud.write_message_to_pool(pool, message, signature)
+    db_message = await crud.write_message_to_pool(pool, message_type, message, signature)
     logger.info(f"Wrote a new message to pool {pool}: {db_message}.")
 
     match db_message.type:
         case MessageType.plaintext:
-            print(1)
             return models.response.ResponsePlaintextMessage.from_db_model(db_message)
         case MessageType.encrypted:
             return models.response.ResponseEncryptedMessage.from_db_model(db_message)

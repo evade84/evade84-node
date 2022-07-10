@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from beanie import Link
 from pydantic import BaseModel
 
 from node.enums import MessageType, PoolType
@@ -22,10 +21,10 @@ class ResponseSignature(BaseModel):
     description: str | None
     created_at: datetime
 
-    @classmethod
-    async def from_link(cls, signature: Link[database.Signature]):
-        signature = await signature.fetch()
-        return cls.from_db_model(signature)
+    # @classmethod
+    # async def from_link(cls, signature: Link[database.Signature]):
+    #     signature = await signature.fetch()
+    #     return cls.from_db_model(signature)
 
     @classmethod
     def from_db_model(cls, signature: database.Signature):

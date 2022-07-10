@@ -1,6 +1,4 @@
-from typing import Any
-
-from pydantic import BaseModel, Extra, Field, ValidationError, root_validator, validator
+from pydantic import BaseModel, Extra, Field
 
 from node.enums import MessageType, PoolType
 
@@ -20,21 +18,9 @@ def TagField():  # noqa
     return Field(default=None, regex=r".+")
 
 
-class RequestUpdateSignature(BaseModel):
-    new_description: str | None = DescriptionField()
-    new_key: str | None = KeyField(optional=True)
-    new_value: str | None = Field(default=None, min_length=1, max_length=50)
-
-
 class RequestSignature(BaseModel):
     uuid: str = Field()
     key: str = KeyField()
-
-
-# class RequestUpdateSignature(BaseModel):
-#     key: str = Field()
-#     new_key: str | None = key_field(optional=True)
-#     description: str | None = description_field()
 
 
 class RequestNewSignature(BaseModel):
@@ -43,12 +29,10 @@ class RequestNewSignature(BaseModel):
     description: str | None = DescriptionField()
 
 
-class RequestUpdatePool(BaseModel):
+class RequestUpdateSignature(BaseModel):
     new_description: str | None = DescriptionField()
-
-    new_master_key: str | None = KeyField(optional=True)
-    new_writer_key: str | None = KeyField(optional=True)
-    new_reader_key: str | None = KeyField(optional=True)
+    new_key: str | None = KeyField(optional=True)
+    new_value: str | None = Field(default=None, min_length=1, max_length=50)
 
 
 class RequestNewPool(BaseModel, extra=Extra.forbid):
@@ -96,6 +80,14 @@ class RequestNewPool(BaseModel, extra=Extra.forbid):
                 f"pool with type {pool_type} can't be encrypted (only pools with type chat can be encrypted)"
             )
         return errors
+
+
+class RequestUpdatePool(BaseModel):
+    new_description: str | None = DescriptionField()
+
+    new_master_key: str | None = KeyField(optional=True)
+    new_writer_key: str | None = KeyField(optional=True)
+    new_reader_key: str | None = KeyField(optional=True)
 
 
 class RequestNewMessage(BaseModel, extra=Extra.forbid):
