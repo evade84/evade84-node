@@ -3,7 +3,7 @@ from typing import Union
 from fastapi import APIRouter
 from loguru import logger
 
-from node import auth, crud, exceptions, models, slicing, util
+from node import auth, crud, exceptions, models, pagination, util
 from node.enums import MessageType, PoolType
 
 router = APIRouter(prefix="/pool")
@@ -13,19 +13,19 @@ router = APIRouter(prefix="/pool")
     "/create",
     response_model=models.response.ResponsePool,
     summary="Create a new pool",
-    description="Creates new pool",
+    description="Creates new pool.",
     responses=util.generate_responses(
-        "Returns newly created pool object",
-        [exceptions.ConflictException, exceptions.IncorrectInputException],
+        "Returns newly created pool object.",
+        api_exceptions=[exceptions.ConflictException],
     ),
 )
 async def create_pool(
-    type: PoolType,  # noqa
+    pool_type: PoolType,  # noqa
     new_pool: models.request.RequestNewPool,
 ):
-    errors = new_pool.validate_based_on_type(type)
+    errors = new_pool.validate_based_on_type(pool_type)
     if errors:
-        raise exceptions.IncorrectInputException(
+        raise exceptions.UnprocessableEntityException(
             util.build_errors_message("Incorrect pool fields", errors)
         )
 
@@ -36,7 +36,7 @@ async def create_pool(
         if new_pool.creator_signature
         else None
     )
-    db_pool = models.database.Pool.from_request_model(type, new_pool, creator_signature)
+    db_pool = models.database.Pool.from_request_model(pool_type, new_pool, creator_signature)
     await db_pool.save()
     logger.info(f"Created new pool: {db_pool}.")
     return models.response.ResponsePool.from_db_model(db_pool)
@@ -46,13 +46,13 @@ async def create_pool(
     "/list",
     response_model=models.response.ResponsePools,
     summary="Get list of all public pools",
-    description="Returns list of public pool objects",
-    responses=util.generate_responses("Returns list of public pool objects", []),
+    description="Returns list of public pool objects.",
+    responses=util.generate_responses("Returns list of public pool objects.", api_exceptions=[]),
 )
-async def list_public_pools(first: int | None = None, last: int | None = None):
-    slicing.validate_params(first, last)
+async def list_public_pools(limit: int, offset: int):
+    pagination.validate_limit_offset_params(limit, offset)
     pools = await crud.get_public_pools()
-    target_pools = slicing.slice_list(pools, first, last)
+    target_pools = pagination.paginate_limit_offset(pools, limit, offset)
     return models.response.ResponsePools(
         total=len(pools),
         count=len(target_pools),
@@ -64,10 +64,10 @@ async def list_public_pools(first: int | None = None, last: int | None = None):
     "/{identifier}",
     response_model=models.response.ResponsePool,
     summary="Get pool information",
-    description="Returns requested pool object",
+    description="Returns requested pool object.",
     responses=util.generate_responses(
-        "Returns requested pool object",
-        [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
+        "Returns requested pool object.",
+        api_exceptions=[exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
     ),
 )
 async def get_pool(
@@ -101,14 +101,10 @@ async def get_pool(
     "/{identifier}/read",
     response_model=models.response.ResponseMessages,
     summary="Read messages from pool",
-    description="Returns list of messages from the requested pool",
+    description="Returns list of messages from the requested pool.",
     responses=util.generate_responses(
-        "Returns list of messages from the requested pool",
-        [
-            exceptions.PoolDoesNotExistException,
-            exceptions.AccessDeniedException,
-            exceptions.IncorrectInputException,
-        ],
+        "Returns list of messages from the requested pool.",
+        [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
     ),
 )
 async def read_pool(
@@ -117,7 +113,7 @@ async def read_pool(
     last: int | None = None,
     reader_key: str | None = None,
 ):
-    slicing.validate_params(first, last)
+    pagination.validate_first_last_params(first, last)
     pool = await crud.get_pool(identifier)
     if not pool:
         raise exceptions.PoolDoesNotExistException()
@@ -128,7 +124,7 @@ async def read_pool(
         else:
             raise exceptions.AccessDeniedException("Reader key is required to read this pool.")
 
-    messages = slicing.slice_list(pool.messages, first, last)
+    messages = pagination.paginate_first_last(pool.messages, first, last)
     logger.info(f"Read some messages from pool {pool}.")
     return models.response.ResponseMessages(
         encrypted=pool.encrypted,
@@ -144,7 +140,7 @@ async def read_pool(
         models.response.ResponsePlaintextMessage, models.response.ResponseEncryptedMessage
     ],
     summary="Write a message to pool",
-    description="Adds a new message to pool messages list, returns newly created message object",
+    description="Adds a new message to pool messages list, returns newly created message object.",
     responses=util.generate_responses(
         "Returns newly created message object.",
         [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
@@ -158,7 +154,7 @@ async def write_to_pool(
 ):
     errors = message.validate_based_on_type(message_type)
     if errors:
-        raise exceptions.IncorrectInputException(
+        raise exceptions.UnprocessableEntityException(
             util.build_errors_message("Invalid message fields", errors)
         )
 
@@ -170,7 +166,7 @@ async def write_to_pool(
         if not writer_key:
             raise exceptions.AccessDeniedException("Writer key is required to write to this pool.")
         if not auth.verify_key(writer_key, pool.writer_key_hash):
-            raise exceptions.AccessDeniedException("Invalid writer key.")
+            raise exceptions.InvalidWriterKeyException("Invalid writer key.")
 
     if pool.encrypted != (message_type == MessageType.encrypted):
         raise exceptions.ConflictException(
@@ -195,8 +191,10 @@ async def write_to_pool(
     "/{identifier}/update",
     response_model=models.response.ResponsePool,
     summary="Update pool",
-    description="Updates some pool fields",
-    responses=util.generate_responses("Returns updated pool object", [exceptions.AccessDeniedException]),
+    description="Updates some pool fields.",
+    responses=util.generate_responses(
+        "Returns updated pool object", api_exceptions=[exceptions.AccessDeniedException]
+    ),
 )
 async def update_pool(identifier: str, master_key: str, pool_data: models.request.RequestUpdatePool):
     pool = await crud.get_pool(identifier)
@@ -222,10 +220,10 @@ async def update_pool(identifier: str, master_key: str, pool_data: models.reques
     "/{identifier}/delete",
     response_model=models.response.ResponsePool,
     summary="Delete pool",
-    description="Deletes pool",
+    description="Deletes pool.",
     responses=util.generate_responses(
         "Returns deleted pool object.",
-        [exceptions.AccessDeniedException, exceptions.PoolDoesNotExistException],
+        api_exceptions=[exceptions.AccessDeniedException, exceptions.PoolDoesNotExistException],
     ),
 )
 async def delete_pool(identifier: str, master_key: str):

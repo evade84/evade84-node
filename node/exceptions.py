@@ -1,56 +1,58 @@
-class APIErrorException(Exception):
+class APIException(Exception):
     status_code: int
-    description: str
     error_message: str | None = None
 
-    def __init__(self, message: str | None = None):
-        if message:
-            self.error_message = message
-        if (
-            not self.error_message
-        ):  # if no error message provided description becomes also an error message
-            self.error_message = self.description + "."
+    def __init__(self, error_message: str | None = None):
+        if error_message:
+            self.error_message = error_message
+        if not self.error_message:
+            raise RuntimeError("API exception does not have error message.")
 
 
-class ConflictException(APIErrorException):
+class ConflictException(APIException):
     status_code = 409
-    description = "The request cannot be processed because of conflict"
+    error_message = "The request cannot be processed because of conflict."
 
 
-class NotFoundException(APIErrorException):
+class NotFoundException(APIException):
     status_code = 404
-    description = "Requested item does not exist"
+    error_message = "Requested item does not exist."
 
 
 class PoolDoesNotExistException(NotFoundException):
-    description = "Pool does not exist"
+    error_message = "Pool does not exist."
 
 
 class SignatureNotFoundException(NotFoundException):
-    description = "Signature does not exist"
+    error_message = "Signature does not exist."
 
 
-class AccessDeniedException(APIErrorException):
+class AccessDeniedException(APIException):
     status_code = 403
-    description = "Access to the requested resource has been denied"
+    error_message = "Access to the requested resource has been denied."
 
 
 class InvalidMasterKeyException(AccessDeniedException):
-    description = "Invalid master key"
+    error_message = "Invalid master key."
 
 
 class InvalidWriterKeyException(AccessDeniedException):
-    description = "Invalid writer key"
+    error_message = "Invalid writer key."
 
 
 class InvalidReaderKeyException(AccessDeniedException):
-    description = "Invalid reader key"
+    error_message = "Invalid reader key."
 
 
-class InvalidSignatureKey(AccessDeniedException):
-    description = "Invalid signature key"
+class InvalidSignatureKeyException(AccessDeniedException):
+    error_message = "Invalid signature key."
 
 
-class IncorrectInputException(APIErrorException):
-    status_code = 400
-    description = "Input data is incorrect"
+class UnprocessableEntityException(APIException):
+    status_code = 422
+    error_message = "Unprocessable entity."
+
+
+class InternalServerErrorException(APIException):
+    status_code = 500
+    error_message = "Internal server error."

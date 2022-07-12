@@ -10,8 +10,8 @@ router = APIRouter(prefix="/signature")
     "/create",
     response_model=models.response.ResponseSignature,
     summary="Create signature",
-    description="Creates new signature",
-    responses=util.generate_responses("Returns newly created signature", []),
+    description="Creates new signature.",
+    responses=util.generate_responses("Returns newly created signature.", api_exceptions=[]),
 )
 async def create_signature(signature: models.request.RequestNewSignature):
     db_signature = models.database.Signature.from_request(signature)
@@ -24,9 +24,9 @@ async def create_signature(signature: models.request.RequestNewSignature):
     "/{uuid}",
     response_model=models.response.ResponseSignature,
     summary="Get signature information",
-    description="Returns information about signature",
+    description="Returns information about signature.",
     responses=util.generate_responses(
-        "Returns requested signature object", [exceptions.SignatureNotFoundException]
+        "Returns requested signature object.", api_exceptions=[exceptions.SignatureNotFoundException]
     ),
 )
 async def get_signature(uuid: str):
@@ -40,9 +40,9 @@ async def get_signature(uuid: str):
     "/{uuid}/update",
     response_model=models.response.ResponseSignature,
     summary="Update signature",
-    description="Updates some signature fields",
+    description="Updates some signature fields.",
     responses=util.generate_responses(
-        "Returns updated signature object", [exceptions.AccessDeniedException]
+        "Returns updated signature object.", api_exceptions=[exceptions.AccessDeniedException]
     ),
 )
 async def update_signature(uuid: str, key: str, signature_data: models.request.RequestUpdateSignature):

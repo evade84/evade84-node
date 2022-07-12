@@ -1,14 +1,15 @@
 from beanie import init_beanie
-from fastapi import FastAPI, status
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from loguru import logger
 from motor import motor_asyncio
 
+from node import NODE_VERSION
 from node.config import config
-from node.exceptions import APIErrorException
+from node.exceptions import APIException, InternalServerErrorException
 from node.models.database import Pool, Signature
-from node.models.response import ResponseError, ResponseRequestValidationError
+from node.models.response import ResponseError
 from node.routers.node import router as node_router
 from node.routers.pool import router as pool_router
 from node.routers.root import router as root_router
@@ -43,7 +44,7 @@ tags_metadata = [
 ]
 
 app = FastAPI(
-    title=f"evade84-node ({config.NODE_NAME})",
+    title=f"evade84-node v{NODE_VERSION}",
     description="Fundamental system of anonymous communication.",
     version="0.1.0",
     docs_url="/swagger",
@@ -53,20 +54,43 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logger.exception(exc)
+        return JSONResponse(
+            content=ResponseError(
+                error_id="InternalServerError",
+                error_message="Internal server error.",
+                error_details=None,
+            ).dict(),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_, exc: RequestValidationError):
+async def request_validation_error_handler(_, exc: RequestValidationError):
     return JSONResponse(
-        content=ResponseRequestValidationError(
-            error_message="Request validation error.", detail=exc.errors()
+        content=ResponseError(
+            error_id="UnprocessableEntity",
+            error_message="Request validation error.",
+            error_details=exc.errors(),
         ).dict(),
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     )
 
 
-@app.exception_handler(APIErrorException)
-async def api_error_exception_handler(_, exc: APIErrorException):
+@app.exception_handler(APIException)
+async def api_exception_handler(_, exc: APIException):
     return JSONResponse(
-        content=ResponseError(error_message=exc.error_message).dict(), status_code=exc.status_code
+        content=ResponseError(
+            error_id=exc.__class__.__name__.replace("Exception", ""),
+            error_message=exc.error_message,
+            detail=None,
+        ).dict(),
+        status_code=exc.status_code,
     )
 
 

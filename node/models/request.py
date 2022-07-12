@@ -22,31 +22,68 @@ class RequestSignature(BaseModel):
     uuid: str = Field()
     key: str = KeyField()
 
+    class Config:
+        schema_extra = {"example": {"uuid": "Dji5y", "key": "very-strong-key"}}
+
 
 class RequestNewSignature(BaseModel):
     value: str = Field()
-    key: str = KeyField()
     description: str | None = DescriptionField()
+    key: str = KeyField()
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "value": "Elon R. Musk",
+                "description": "The official signature of Elon Musk (for real)!",
+                "key": "very-strong-key",
+            }
+        }
 
 
 class RequestUpdateSignature(BaseModel):
+    new_value: str | None = Field(default=None, min_length=1, max_length=50)
     new_description: str | None = DescriptionField()
     new_key: str | None = KeyField(optional=True)
-    new_value: str | None = Field(default=None, min_length=1, max_length=50)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "new_value": "Bart Simpson",
+                "new_description": "This is totally new description.",
+                "new_key": "a-new-stronger-key",
+            }
+        }
 
 
-class RequestNewPool(BaseModel, extra=Extra.forbid):
+class RequestNewPool(BaseModel):
     tag: str | None = TagField()
     description: str | None = DescriptionField()
 
-    public: bool = Field(default=False)
-    encrypted: bool = Field(default=False)
+    public: bool | None = Field(default=False)
+    encrypted: bool | None = Field(default=False)
 
     creator_signature: RequestSignature | None = Field(default=None)
 
     master_key: str = KeyField()
-    writer_key: str = KeyField(optional=True)
-    reader_key: str = KeyField(optional=True)
+    writer_key: str | None = KeyField(optional=True)
+    reader_key: str | None = KeyField(optional=True)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "tag": "cool-guys-gachi",
+                "description": "Friends' chat.",
+                "public": False,
+                "encrypted": False,
+                "creator_signature": None,
+                "master_key": "secret-master-key",
+                "writer_key": "secret-writer-key",
+                "reader_key": "secret-reader-key",
+            },
+            "title": "123",
+            "extra": Extra.forbid,
+        }
 
     def validate_based_on_type(self, pool_type: PoolType) -> list[str]:
         """Returns list of errors detected. (Empty list if not errors)"""
@@ -89,15 +126,34 @@ class RequestUpdatePool(BaseModel):
     new_writer_key: str | None = KeyField(optional=True)
     new_reader_key: str | None = KeyField(optional=True)
 
+    class Config:
+        schema_extra = {
+            "example": {
+                "new_description": "This is totally new description.",
+                "new_master_key": "a-new-stronger-master-key",
+                "new_writer_key": "a-new-stronger-writer-key",
+                "new_reader_key": "a-new-stronger-reader-key",
+            }
+        }
 
-class RequestNewMessage(BaseModel, extra=Extra.forbid):
-    signature: RequestSignature | None = Field(default=None)
 
+class RequestNewMessage(BaseModel):
     plaintext: str | None = Field(default=None, min_length=1, max_length=10000)
 
     AES_ciphertext: bytes | None = Field(default=None, min_length=1)
     AES_nonce: bytes | None = Field(default=None, min_length=1)
     AES_tag: bytes | None = Field(default=None, min_length=1)
+
+    signature: RequestSignature | None = Field(default=None)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "plaintext": "Hi everyone here!",
+                "signature": {"uuid": "uuid", "key": "signature-key"},  # todo: uuid
+            },
+            "extra": Extra.forbid,
+        }
 
     def validate_based_on_type(self, message_type: MessageType) -> list[str]:
         errors = []

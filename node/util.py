@@ -3,7 +3,7 @@ from typing import Any, NoReturn, Type
 from node import auth, exceptions, models
 
 # from node.enums import PoolType
-from node.exceptions import APIErrorException
+from node.exceptions import APIException
 
 # from fastapi.exceptions import RequestValidationError
 # from pydantic import BaseConfig, ValidationError
@@ -11,18 +11,18 @@ from node.exceptions import APIErrorException
 
 
 def generate_responses(
-    success_description: str, api_exceptions: list[Type[APIErrorException]]
+    success_description: str, api_exceptions: list[Type[APIException]]
 ) -> dict[int, dict[str, Any]]:
     responses = {
-        200: {"description": f"**Successful response**\n\n{success_description}"},
+        200: {"description": f"**Successful response:**\n\n{success_description}"},
         422: {
-            "description": "**Request validation error**",
-            "model": models.response.ResponseRequestValidationError,
+            "description": "**Unprocessable entity.**",
+            "model": models.response.ResponseError,
         },
     }
     for exception in api_exceptions:
         responses[exception.status_code] = {
-            "description": f"**{exception.description}**",
+            "description": f"**{exception.error_message}**",
             "model": models.response.ResponseError,
         }
     return responses
@@ -37,7 +37,7 @@ async def get_verified_signature(
     if not db_signature:
         raise exceptions.SignatureNotFoundException()
     if not auth.verify_key(signature.key, db_signature.key_hash):
-        raise exceptions.AccessDeniedException("Invalid signature key.")
+        raise exceptions.InvalidSignatureKeyException("Invalid signature key.")
     return db_signature
 
 

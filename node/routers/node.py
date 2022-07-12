@@ -2,7 +2,7 @@ import time
 
 from fastapi import APIRouter
 
-from node import NODE_VERSION, START_TIME, crud, models, util
+from node import NODE_VERSION, START_TIME, models, util
 from node.config import config
 
 router = APIRouter(prefix="/node")
@@ -11,8 +11,8 @@ router = APIRouter(prefix="/node")
 @router.get(
     "",
     summary="Get information about the current node",
-    description="Returns current node information",
-    responses=util.generate_responses("Returns current node information", []),
+    description="Returns current node information.",
+    responses=util.generate_responses("Returns current node information.", api_exceptions=[]),
     response_model=models.response.ResponseNode,
 )
 async def get_node():

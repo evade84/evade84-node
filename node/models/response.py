@@ -8,11 +8,13 @@ from node.models import database
 
 
 class ResponseError(BaseModel):
+    error_id: str
     error_message: str
+    error_details: Any | None
 
 
-class ResponseRequestValidationError(ResponseError):
-    detail: list[dict[str, Any]]
+# class ResponseRequestValidationError(ResponseError):
+#     detail: list[dict[str, Any]]
 
 
 class ResponseSignature(BaseModel):

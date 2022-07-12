@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>evade84-node</title>
+    <style>
+        .monospace {
+            font-family: monospace;
+        }
+        .italic {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>evade84-node is running right here!</h1>
+    <h2>Node information:</h2>
+    <p><b>Name:</b> {{ node_name }}</p>
+    <p><b>Description:</b> <span class="italic">{{ node_description }}</span></p>
+    <p><b>Version:</b> <span class="monospace">{{ node_version }}</span></p>
+    <p><b>URL</b>: <span class="monospace">{{ request.url }}</span></p>
+    <h2>Useful links:</h2>
+    <ul>
+        <li>
+            <a href="/swagger">Current node API documentation (swagger UI)</a>
+        </li>
+        <li>
+            <a href="/node">Current node information (json)</a>
+        </li>
+        <li>
+            <a href="https://evade84.github.io">Documentation and manuals</a>
+        </li>
+        <li>
+            <a href="https://github.com/evade84/evade84-node">evade84-node source code</a>
+        </li>
+        <li>
+            <a href="https://github.com/evade84">Project at GitHub</a>
+        </li>
+    </ul>
+</body>
+</html>
