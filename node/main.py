@@ -18,7 +18,7 @@ from node.routers.signature import router as signature_router
 tags_metadata = [
     {
         "name": "node",
-        "description": "node information",
+        "description": "Node information",
         "externalDocs": {
             "description": "About nodes",
             "url": "https://evade84.github.io/getting-started/basic-definitions/#node",
@@ -26,7 +26,7 @@ tags_metadata = [
     },
     {
         "name": "pool",
-        "description": "operations with pools",
+        "description": "Operations with pools",
         "externalDocs": {
             "description": "About pools",
             "url": "https://evade84.github.io/getting-started/basic-definitions/#pool",
@@ -34,7 +34,7 @@ tags_metadata = [
     },
     {
         "name": "signature",
-        "description": "operations with signatures",
+        "description": "Operations with signatures",
         "externalDocs": {
             "description": "About signatures",
             "url": "https://evade84.github.io/getting-started/basic-definitions/#signature",

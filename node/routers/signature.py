@@ -20,22 +20,6 @@ async def create_signature(signature: models.request.RequestNewSignature):
     return models.response.ResponseSignature.from_db_model(db_signature)
 
 
-@router.get(
-    "/{uuid}",
-    response_model=models.response.ResponseSignature,
-    summary="Get signature information",
-    description="Returns information about signature.",
-    responses=util.generate_responses(
-        "Returns requested signature object.", api_exceptions=[exceptions.SignatureNotFoundException]
-    ),
-)
-async def get_signature(uuid: str):
-    signature = await crud.get_signature(uuid)
-    if not signature:
-        raise exceptions.SignatureNotFoundException()
-    return models.response.ResponseSignature.from_db_model(signature)
-
-
 @router.post(
     "/{uuid}/update",
     response_model=models.response.ResponseSignature,
@@ -59,4 +43,20 @@ async def update_signature(uuid: str, key: str, signature_data: models.request.R
         signature.key_hash = auth.hash_key(signature_data.new_key)
     await signature.save()
     logger.info(f"Updated signature {signature}")
+    return models.response.ResponseSignature.from_db_model(signature)
+
+
+@router.get(
+    "/{uuid}",
+    response_model=models.response.ResponseSignature,
+    summary="Get signature information",
+    description="Returns information about signature.",
+    responses=util.generate_responses(
+        "Returns requested signature object.", api_exceptions=[exceptions.SignatureNotFoundException]
+    ),
+)
+async def get_signature(uuid: str):
+    signature = await crud.get_signature(uuid)
+    if not signature:
+        raise exceptions.SignatureNotFoundException()
     return models.response.ResponseSignature.from_db_model(signature)

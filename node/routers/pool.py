@@ -42,22 +42,54 @@ async def create_pool(
     return models.response.ResponsePool.from_db_model(db_pool)
 
 
-@router.get(
-    "/list",
-    response_model=models.response.ResponsePools,
-    summary="Get list of all public pools",
-    description="Returns list of public pool objects.",
-    responses=util.generate_responses("Returns list of public pool objects.", api_exceptions=[]),
+@router.post(
+    "/{identifier}/update",
+    response_model=models.response.ResponsePool,
+    summary="Update pool",
+    description="Updates some pool fields.",
+    responses=util.generate_responses(
+        "Returns updated pool object", api_exceptions=[exceptions.AccessDeniedException]
+    ),
 )
-async def list_public_pools(limit: int, offset: int):
-    pagination.validate_limit_offset_params(limit, offset)
-    pools = await crud.get_public_pools()
-    target_pools = pagination.paginate_limit_offset(pools, limit, offset)
-    return models.response.ResponsePools(
-        total=len(pools),
-        count=len(target_pools),
-        pools=[models.response.ResponsePool.from_db_model(db_pool) for db_pool in target_pools],
-    )
+async def update_pool(identifier: str, master_key: str, pool_data: models.request.RequestUpdatePool):
+    pool = await crud.get_pool(identifier)
+    if not pool:
+        raise exceptions.PoolDoesNotExistException()
+    if not auth.verify_key(master_key, pool.master_key_hash):
+        raise exceptions.InvalidMasterKeyException()
+
+    if pool_data.new_description:
+        pool.description = pool_data.new_description
+    if pool_data.new_master_key:
+        pool.master_key_hash = auth.hash_key(pool_data.new_master_key)
+    if pool_data.new_writer_key:
+        pool.writer_key_hash = auth.hash_key(pool_data.new_writer_key)
+    if pool_data.new_reader_key:
+        pool.reader_key_hash = auth.hash_key(pool_data.new_reader_key)
+    await pool.save()
+    logger.info(f"Updated pool {pool}.")
+    return models.response.ResponsePool.from_db_model(pool)
+
+
+@router.delete(
+    "/{identifier}/delete",
+    response_model=models.response.ResponsePool,
+    summary="Delete pool",
+    description="Deletes pool.",
+    responses=util.generate_responses(
+        "Returns deleted pool object.",
+        api_exceptions=[exceptions.AccessDeniedException, exceptions.PoolDoesNotExistException],
+    ),
+)
+async def delete_pool(identifier: str, master_key: str):
+    pool = await crud.get_pool(identifier)
+    if not pool:
+        raise exceptions.PoolDoesNotExistException()
+    if not auth.verify_key(master_key, pool.master_key_hash):
+        raise exceptions.InvalidMasterKeyException()
+    await pool.delete()
+    logger.info(f"Deleted pool {pool}.")
+    return models.response.ResponsePool.from_db_model(pool)
 
 
 @router.get(
@@ -98,39 +130,20 @@ async def get_pool(
 
 
 @router.get(
-    "/{identifier}/read",
-    response_model=models.response.ResponseMessages,
-    summary="Read messages from pool",
-    description="Returns list of messages from the requested pool.",
-    responses=util.generate_responses(
-        "Returns list of messages from the requested pool.",
-        [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
-    ),
+    "/list",
+    response_model=models.response.ResponsePools,
+    summary="Get list of all public pools",
+    description="Returns list of public pool objects.",
+    responses=util.generate_responses("Returns list of public pool objects.", api_exceptions=[]),
 )
-async def read_pool(
-    identifier: str,
-    first: int | None = None,
-    last: int | None = None,
-    reader_key: str | None = None,
-):
-    pagination.validate_first_last_params(first, last)
-    pool = await crud.get_pool(identifier)
-    if not pool:
-        raise exceptions.PoolDoesNotExistException()
-    if pool.reader_key_hash:
-        if reader_key:
-            if not auth.verify_key(reader_key, pool.reader_key_hash):
-                raise exceptions.InvalidReaderKeyException()
-        else:
-            raise exceptions.AccessDeniedException("Reader key is required to read this pool.")
-
-    messages = pagination.paginate_first_last(pool.messages, first, last)
-    logger.info(f"Read some messages from pool {pool}.")
-    return models.response.ResponseMessages(
-        encrypted=pool.encrypted,
-        total=len(pool.messages),
-        count=len(messages),
-        messages=messages,
+async def list_public_pools(limit: int, offset: int):
+    pagination.validate_limit_offset_params(limit, offset)
+    pools = await crud.get_public_pools()
+    target_pools = pagination.paginate_limit_offset(pools, limit, offset)
+    return models.response.ResponsePools(
+        total=len(pools),
+        count=len(target_pools),
+        pools=[models.response.ResponsePool.from_db_model(db_pool) for db_pool in target_pools],
     )
 
 
@@ -187,51 +200,38 @@ async def write_to_pool(
             raise ValueError("Invalid message type.")
 
 
-@router.post(
-    "/{identifier}/update",
-    response_model=models.response.ResponsePool,
-    summary="Update pool",
-    description="Updates some pool fields.",
+@router.get(
+    "/{identifier}/read",
+    response_model=models.response.ResponseMessages,
+    summary="Read messages from pool",
+    description="Returns list of messages from the requested pool.",
     responses=util.generate_responses(
-        "Returns updated pool object", api_exceptions=[exceptions.AccessDeniedException]
+        "Returns list of messages from the requested pool.",
+        [exceptions.PoolDoesNotExistException, exceptions.AccessDeniedException],
     ),
 )
-async def update_pool(identifier: str, master_key: str, pool_data: models.request.RequestUpdatePool):
+async def read_pool(
+    identifier: str,
+    first: int | None = None,
+    last: int | None = None,
+    reader_key: str | None = None,
+):
+    pagination.validate_first_last_params(first, last)
     pool = await crud.get_pool(identifier)
     if not pool:
         raise exceptions.PoolDoesNotExistException()
-    if not auth.verify_key(master_key, pool.master_key_hash):
-        raise exceptions.InvalidMasterKeyException()
+    if pool.reader_key_hash:
+        if reader_key:
+            if not auth.verify_key(reader_key, pool.reader_key_hash):
+                raise exceptions.InvalidReaderKeyException()
+        else:
+            raise exceptions.AccessDeniedException("Reader key is required to read this pool.")
 
-    if pool_data.new_description:
-        pool.description = pool_data.new_description
-    if pool_data.new_master_key:
-        pool.master_key_hash = auth.hash_key(pool_data.new_master_key)
-    if pool_data.new_writer_key:
-        pool.writer_key_hash = auth.hash_key(pool_data.new_writer_key)
-    if pool_data.new_reader_key:
-        pool.reader_key_hash = auth.hash_key(pool_data.new_reader_key)
-    await pool.save()
-    logger.info(f"Updated pool {pool}.")
-    return models.response.ResponsePool.from_db_model(pool)
-
-
-@router.delete(
-    "/{identifier}/delete",
-    response_model=models.response.ResponsePool,
-    summary="Delete pool",
-    description="Deletes pool.",
-    responses=util.generate_responses(
-        "Returns deleted pool object.",
-        api_exceptions=[exceptions.AccessDeniedException, exceptions.PoolDoesNotExistException],
-    ),
-)
-async def delete_pool(identifier: str, master_key: str):
-    pool = await crud.get_pool(identifier)
-    if not pool:
-        raise exceptions.PoolDoesNotExistException()
-    if not auth.verify_key(master_key, pool.master_key_hash):
-        raise exceptions.InvalidMasterKeyException()
-    await pool.delete()
-    logger.info(f"Deleted pool {pool}.")
-    return models.response.ResponsePool.from_db_model(pool)
+    messages = pagination.paginate_first_last(pool.messages, first, last)
+    logger.info(f"Read some messages from pool {pool}.")
+    return models.response.ResponseMessages(
+        encrypted=pool.encrypted,
+        total=len(pool.messages),
+        count=len(messages),
+        messages=messages,
+    )
