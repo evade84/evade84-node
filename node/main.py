@@ -16,20 +16,13 @@ from node.routers.root import router as root_router
 from node.routers.signature import router as signature_router
 
 tags_metadata = [
+    {"name": "root", "description": "root route"},
     {
         "name": "node",
         "description": "Node information",
         "externalDocs": {
             "description": "About nodes",
             "url": "https://evade84.github.io/getting-started/basic-definitions/#node",
-        },
-    },
-    {
-        "name": "pool",
-        "description": "Operations with pools",
-        "externalDocs": {
-            "description": "About pools",
-            "url": "https://evade84.github.io/getting-started/basic-definitions/#pool",
         },
     },
     {
@@ -40,7 +33,15 @@ tags_metadata = [
             "url": "https://evade84.github.io/getting-started/basic-definitions/#signature",
         },
     },
-    {"name": "root", "description": "root route"},
+    {
+        "name": "pool",
+        "description": "Operations with pools",
+        "externalDocs": {
+            "description": "About pools",
+            "url": "https://evade84.github.io/getting-started/basic-definitions/#pool",
+        },
+    },
+
 ]
 
 app = FastAPI(

@@ -2,12 +2,7 @@ from typing import Any, NoReturn, Type
 
 from node import auth, exceptions, models
 
-# from node.enums import PoolType
 from node.exceptions import APIException
-
-# from fastapi.exceptions import RequestValidationError
-# from pydantic import BaseConfig, ValidationError
-# from pydantic.error_wrappers import ErrorWrapper, error_dict
 
 
 def generate_responses(

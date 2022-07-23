@@ -6,7 +6,7 @@ from beanie import Document, Link
 from pydantic import BaseModel, Field, validator
 from shortuuid import ShortUUID
 
-from node import auth, models
+from node import auth
 from node.enums import MessageType, PoolType
 
 
