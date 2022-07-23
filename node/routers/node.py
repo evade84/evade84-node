@@ -23,7 +23,7 @@ async def get_node():
         name=config.NODE_NAME,
         description=config.NODE_DESCRIPTION,
         version=NODE_VERSION,
-        uptime=time.time() - START_TIME,
+        uptime_sec=time.time() - START_TIME,
         pools_count=pools_count,
         signatures_count=signatures_count,
     )

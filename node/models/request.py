@@ -23,7 +23,7 @@ class RequestSignature(BaseModel):
     key: str = KeyField()
 
     class Config:
-        schema_extra = {"example": {"uuid": "Dji5y", "key": "very-strong-key"}}
+        schema_extra = {"example": {"uuid": "Dji5y", "key": "very-strong-key"}, "extra": Extra.forbid}
 
 
 class RequestNewSignature(BaseModel):
@@ -37,7 +37,8 @@ class RequestNewSignature(BaseModel):
                 "value": "Elon R. Musk",
                 "description": "The official signature of Elon Musk (for real)!",
                 "key": "very-strong-key",
-            }
+            },
+            "extra": Extra.forbid,
         }
 
 
@@ -47,13 +48,16 @@ class RequestUpdateSignature(BaseModel):
     new_key: str | None = KeyField(optional=True)
 
     class Config:
-        schema_extra = {
-            "example": {
-                "new_value": "Bart Simpson",
-                "new_description": "This is totally new description.",
-                "new_key": "a-new-stronger-key",
-            }
-        }
+        schema_extra = (
+            {
+                "example": {
+                    "new_value": "Bart Simpson",
+                    "new_description": "This is totally new description.",
+                    "new_key": "a-new-stronger-key",
+                },
+                "extra": Extra.forbid,
+            },
+        )
 
 
 class RequestNewPool(BaseModel):
@@ -81,7 +85,6 @@ class RequestNewPool(BaseModel):
                 "writer_key": "secret-writer-key",
                 "reader_key": "secret-reader-key",
             },
-            "title": "123",
             "extra": Extra.forbid,
         }
 
@@ -133,7 +136,8 @@ class RequestUpdatePool(BaseModel):
                 "new_master_key": "a-new-stronger-master-key",
                 "new_writer_key": "a-new-stronger-writer-key",
                 "new_reader_key": "a-new-stronger-reader-key",
-            }
+            },
+            "extra": Extra.forbid,
         }
 
 
@@ -177,7 +181,6 @@ class RequestNewMessage(BaseModel):
                     errors.append("encrypted message must have AES_nonce field.")
                 if not self.AES_tag:
                     errors.append("encrypted message must have AES_tag field.")
-
             case _:
                 raise ValueError("Invalid message type.")
 

@@ -13,20 +13,11 @@ class ResponseError(BaseModel):
     error_details: Any | None
 
 
-# class ResponseRequestValidationError(ResponseError):
-#     detail: list[dict[str, Any]]
-
-
 class ResponseSignature(BaseModel):
     uuid: str
     value: str
     description: str | None
     created_at: datetime
-
-    # @classmethod
-    # async def from_link(cls, signature: Link[database.Signature]):
-    #     signature = await signature.fetch()
-    #     return cls.from_db_model(signature)
 
     @classmethod
     def from_db_model(cls, signature: database.Signature):
@@ -126,6 +117,6 @@ class ResponseNode(BaseModel):
     name: str
     description: str
     version: str
-    uptime: int
+    uptime_sec: int
     pools_count: int
     signatures_count: int
